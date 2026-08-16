@@ -98,3 +98,26 @@ def collect_auth_events_from_file(log_path: str | Path) -> list[AuthEvent]:
                 events.append(event)
 
     return events
+
+
+def auth_event_to_security_event(auth_event: AuthEvent):
+    from sentinellite.models.security_event import create_security_event
+
+    severity_map = {
+        "ssh_failed_login": "medium",
+        "ssh_successful_login": "low",
+        "sudo_command": "medium",
+    }
+
+    return create_security_event(
+        source=auth_event.source,
+        event_type=auth_event.event_type,
+        severity=severity_map.get(auth_event.event_type, "info"),
+        message=auth_event.message,
+        evidence={
+            "username": auth_event.username,
+            "source_ip": auth_event.source_ip,
+            "original_timestamp": auth_event.timestamp,
+        },
+        raw_data=auth_event.raw_line,
+    )
