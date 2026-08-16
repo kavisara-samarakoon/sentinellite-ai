@@ -1,25 +1,13 @@
-import platform
-import socket
-import sys
 from typing import Any
 
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+from sentinellite.collectors.system import SystemInfo, collect_system_info
 from sentinellite.config.loader import ConfigError, load_config
 
 console = Console()
-
-
-def get_runtime_mode() -> str:
-    os_name = platform.system()
-
-    if os_name == "Linux":
-        return "Linux target environment"
-    if os_name == "Darwin":
-        return "macOS development environment"
-    return "Unsupported or untested environment"
 
 
 def show_banner(config: dict[str, Any]) -> None:
@@ -33,17 +21,17 @@ Linux Endpoint Security Monitoring Agent
     console.print(Panel.fit(banner, title=app_name, border_style="cyan"))
 
 
-def show_system_info() -> None:
+def show_system_info(system_info: SystemInfo) -> None:
     table = Table(title="System Information")
     table.add_column("Field", style="bold")
     table.add_column("Value")
 
-    table.add_row("Hostname", socket.gethostname())
-    table.add_row("Operating System", platform.system())
-    table.add_row("OS Release", platform.release())
-    table.add_row("Architecture", platform.machine())
-    table.add_row("Python Version", sys.version.split()[0])
-    table.add_row("Runtime Mode", get_runtime_mode())
+    table.add_row("Hostname", system_info.hostname)
+    table.add_row("Operating System", system_info.operating_system)
+    table.add_row("OS Release", system_info.os_release)
+    table.add_row("Architecture", system_info.architecture)
+    table.add_row("Python Version", system_info.python_version)
+    table.add_row("Runtime Mode", system_info.runtime_mode)
 
     console.print(table)
 
@@ -51,6 +39,7 @@ def show_system_info() -> None:
 def format_status(enabled: bool) -> str:
     if enabled:
         return "[green]Enabled[/green]"
+
     return "[red]Disabled[/red]"
 
 
@@ -119,10 +108,12 @@ def main() -> None:
         console.print(f"[red][!] Configuration error: {error}[/red]")
         raise SystemExit(1) from error
 
+    system_info = collect_system_info()
+
     show_banner(config)
     console.print("[green][+] Starting SentinelLite AI...[/green]\n")
 
-    show_system_info()
+    show_system_info(system_info)
     console.print()
     show_modules(config)
     console.print()
@@ -130,7 +121,7 @@ def main() -> None:
 
     console.print("\n[green][+] Status: READY[/green]")
 
-    if platform.system() != "Linux":
+    if system_info.operating_system != "Linux":
         console.print(
             "[yellow][!] Note: SentinelLite AI is designed for Linux monitoring. "
             "You are currently running it in development mode.[/yellow]"
