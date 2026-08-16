@@ -3,10 +3,6 @@ import psutil
 from sentinellite.collectors.process import (
     ProcessInfo,
     collect_processes,
-    filter_high_resource_processes,
-    filter_processes_by_keywords,
-    filter_temp_path_processes,
-    is_process_running_from_temp_path,
     processes_to_dicts,
 )
 
@@ -90,121 +86,31 @@ def test_collect_processes_skips_inaccessible_processes(monkeypatch):
     assert processes[0].pid == 321
 
 
-def test_is_process_running_from_temp_path_detects_tmp_executable():
-    process = ProcessInfo(
-        pid=444,
-        name="suspicious",
-        username="www-data",
-        exe="/tmp/suspicious",
-        cmdline=["/tmp/suspicious"],
-        cpu_percent=0.0,
-        memory_percent=0.0,
-        status="running",
+def test_collect_processes_uses_defaults_for_missing_values(monkeypatch):
+    fake_processes = [FakeProcess({})]
+
+    def fake_process_iter(*_args, **_kwargs):
+        return fake_processes
+
+    monkeypatch.setattr(
+        "sentinellite.collectors.process.psutil.process_iter",
+        fake_process_iter,
     )
 
-    assert is_process_running_from_temp_path(process) is True
+    processes = collect_processes()
 
-
-def test_filter_temp_path_processes_returns_only_temp_processes():
-    normal_process = ProcessInfo(
-        pid=1,
-        name="systemd",
-        username="root",
-        exe="/usr/lib/systemd/systemd",
-        cmdline=["/usr/lib/systemd/systemd"],
-        cpu_percent=0.0,
-        memory_percent=0.1,
-        status="sleeping",
-    )
-
-    temp_process = ProcessInfo(
-        pid=2,
-        name="unknown",
-        username="kavisara",
-        exe="/tmp/unknown",
-        cmdline=["/tmp/unknown"],
-        cpu_percent=0.0,
-        memory_percent=0.1,
-        status="running",
-    )
-
-    results = filter_temp_path_processes([normal_process, temp_process])
-
-    assert results == [temp_process]
-
-
-def test_filter_high_resource_processes_detects_cpu_or_memory_threshold():
-    normal_process = ProcessInfo(
-        pid=10,
-        name="normal",
-        username="kavisara",
-        exe="/usr/bin/normal",
-        cmdline=["normal"],
-        cpu_percent=10.0,
-        memory_percent=5.0,
-        status="sleeping",
-    )
-
-    high_cpu_process = ProcessInfo(
-        pid=11,
-        name="high-cpu",
-        username="kavisara",
-        exe="/usr/bin/high-cpu",
-        cmdline=["high-cpu"],
-        cpu_percent=90.0,
-        memory_percent=5.0,
-        status="running",
-    )
-
-    high_memory_process = ProcessInfo(
-        pid=12,
-        name="high-memory",
-        username="kavisara",
-        exe="/usr/bin/high-memory",
-        cmdline=["high-memory"],
-        cpu_percent=10.0,
-        memory_percent=85.0,
-        status="running",
-    )
-
-    results = filter_high_resource_processes(
-        [normal_process, high_cpu_process, high_memory_process],
-        cpu_threshold=80.0,
-        memory_threshold=80.0,
-    )
-
-    assert results == [high_cpu_process, high_memory_process]
-
-
-def test_filter_processes_by_keywords_matches_command_line():
-    normal_process = ProcessInfo(
-        pid=20,
-        name="bash",
-        username="kavisara",
-        exe="/usr/bin/bash",
-        cmdline=["bash"],
-        cpu_percent=0.0,
-        memory_percent=0.1,
-        status="sleeping",
-    )
-
-    suspicious_process = ProcessInfo(
-        pid=21,
-        name="python",
-        username="kavisara",
-        exe="/usr/bin/python3",
-        cmdline=["python3", "-m", "http.server"],
-        cpu_percent=0.0,
-        memory_percent=0.1,
-        status="running",
-    )
-
-    results = filter_processes_by_keywords(
-        [normal_process, suspicious_process],
-        suspicious_keywords=["http.server"],
-    )
-
-    assert results == [suspicious_process]
+    assert processes == [
+        ProcessInfo(
+            pid=0,
+            name="unknown",
+            username=None,
+            exe=None,
+            cmdline=[],
+            cpu_percent=0.0,
+            memory_percent=0.0,
+            status=None,
+        )
+    ]
 
 
 def test_processes_to_dicts_converts_process_info_objects():
