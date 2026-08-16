@@ -1,0 +1,30 @@
+# Environment files
+.env
+.venv/
+
+# Python cache/build files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# Logs and reports
+logs/*
+reports/*
+!logs/.gitkeep
+!reports/.gitkeep
+*.log
+
+# Local databases
+*.sqlite3
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/

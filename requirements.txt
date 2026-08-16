@@ -1,0 +1,13 @@
+psutil
+watchdog
+pyyaml
+rich
+typer
+pydantic
+python-dotenv
+
+pytest
+ruff
+mypy
+bandit
+pip-audit
