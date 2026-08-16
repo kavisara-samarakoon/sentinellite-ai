@@ -28,3 +28,6 @@ reports/*
 .DS_Store
 .vscode/
 .idea/
+
+# Keep safe example log fixtures
+!examples/auth_logs/*.log
