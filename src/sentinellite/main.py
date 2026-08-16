@@ -97,6 +97,7 @@ def show_risk_thresholds(config: dict[str, Any]) -> None:
     table.add_row("Low", str(risk["low"]))
     table.add_row("Medium", str(risk["medium"]))
     table.add_row("High", str(risk["high"]))
+    table.add_row("Critical", str(risk["critical"]))
 
     console.print(table)
 

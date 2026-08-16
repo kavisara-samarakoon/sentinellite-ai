@@ -34,3 +34,4 @@ risk:
   low: 30
   medium: 60
   high: 80
+  critical: 90
