@@ -1,4 +1,4 @@
-from sentinellite.main import main
+from sentinellite.main import app
 
 if __name__ == "__main__":
-    main()
+    app()
