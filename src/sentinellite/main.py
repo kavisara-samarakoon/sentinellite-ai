@@ -9,6 +9,8 @@ from rich.table import Table
 from sentinellite.collectors.system import SystemInfo, collect_system_info
 from sentinellite.config.loader import ConfigError, load_config
 from sentinellite.pipeline.auth_scan import run_auth_scan
+from sentinellite.pipeline.process_scan import run_process_scan
+from sentinellite.reporting.json_reporter import read_alert_report
 
 console = Console()
 
@@ -189,6 +191,50 @@ def scan_auth_command(
         console.print(alert_table)
     else:
         console.print("[yellow][!] No alerts generated.[/yellow]")
+
+
+@app.command("scan-process")
+def scan_process_command(
+    output_dir: Path = Path("reports"),
+) -> None:
+    """Scan running processes and generate a JSON alert report."""
+    summary = run_process_scan(output_dir=output_dir)
+
+    console.print(Panel.fit("Process Scan Complete", title="SentinelLite AI", border_style="green"))
+
+    table = Table(title="Process Scan Summary")
+    table.add_column("Metric", style="bold")
+    table.add_column("Value")
+
+    table.add_row("Processes found", str(summary.processes_count))
+    table.add_row("Security events created", str(summary.security_events_count))
+    table.add_row("Detection matches", str(summary.detection_matches_count))
+    table.add_row("Scored alerts", str(summary.scored_alerts_count))
+    table.add_row("JSON report", summary.report_path)
+
+    console.print(table)
+
+    if summary.scored_alerts_count:
+        report = read_alert_report(summary.report_path)
+        alerts = report.get("alerts", [])
+
+        alert_table = Table(title="Generated Alerts")
+        alert_table.add_column("Rule ID", style="bold")
+        alert_table.add_column("Risk")
+        alert_table.add_column("Message")
+
+        for alert in alerts:
+            risk_level = str(alert.get("risk_level", "unknown")).upper()
+            risk_score = alert.get("risk_score", "?")
+            alert_table.add_row(
+                str(alert.get("rule_id", "unknown")),
+                f"{risk_level} ({risk_score})",
+                str(alert.get("message", "")),
+            )
+
+        console.print(alert_table)
+    else:
+        console.print("[green][+] No process alerts generated.[/green]")
 
 
 if __name__ == "__main__":
