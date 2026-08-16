@@ -18,9 +18,9 @@ def test_clamp_score() -> None:
 
 def test_get_risk_level() -> None:
     assert get_risk_level(10) == "info"
-    assert get_risk_level(30) == "low"
-    assert get_risk_level(60) == "medium"
-    assert get_risk_level(80) == "high"
+    assert get_risk_level(25) == "low"
+    assert get_risk_level(50) == "medium"
+    assert get_risk_level(75) == "high"
     assert get_risk_level(90) == "critical"
 
 
@@ -52,7 +52,7 @@ def test_score_failed_ssh_rule_match() -> None:
     assert scored_alert.rule_id == "AUTH-001"
     assert scored_alert.base_score == 50
     assert scored_alert.risk_score == 50
-    assert scored_alert.risk_level == "low"
+    assert scored_alert.risk_level == "medium"
 
 
 def test_score_failed_ssh_rule_match_with_modifier() -> None:
@@ -110,4 +110,4 @@ def test_scored_alert_to_dict() -> None:
     assert isinstance(scored_alert_dict, dict)
     assert scored_alert_dict["rule_id"] == "AUTH-001"
     assert scored_alert_dict["risk_score"] == 50
-    assert scored_alert_dict["risk_level"] == "low"
+    assert scored_alert_dict["risk_level"] == "medium"

@@ -4,9 +4,9 @@ from typing import Any
 from sentinellite.detection.engine import RuleMatch
 
 DEFAULT_RISK_THRESHOLDS = {
-    "low": 30,
-    "medium": 60,
-    "high": 80,
+    "low": 25,
+    "medium": 50,
+    "high": 75,
     "critical": 90,
 }
 
