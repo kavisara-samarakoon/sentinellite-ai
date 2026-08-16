@@ -10,6 +10,9 @@ def test_default_rules_are_available() -> None:
     assert "AUTH-001" in rule_ids
     assert "AUTH-002" in rule_ids
     assert "AUTH-003" in rule_ids
+    assert "PROC-001" in rule_ids
+    assert "PROC-002" in rule_ids
+    assert "PROC-003" in rule_ids
 
 
 def test_detect_failed_ssh_login_event() -> None:
@@ -73,6 +76,19 @@ def test_unknown_event_has_no_match() -> None:
     )
 
     matches = detect_event(event)
+
+    assert matches == []
+
+
+def test_empty_custom_rule_list_has_no_match() -> None:
+    event = create_security_event(
+        source="sshd",
+        event_type="ssh_failed_login",
+        severity="medium",
+        message="Failed SSH login test",
+    )
+
+    matches = detect_event(event, rules=[])
 
     assert matches == []
 

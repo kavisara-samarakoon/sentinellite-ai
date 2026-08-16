@@ -30,11 +30,11 @@ def detect_event(
     event: SecurityEvent,
     rules: list[DetectionRule] | None = None,
 ) -> list[RuleMatch]:
-    active_rules = rules or DEFAULT_RULES
+    active_rules = DEFAULT_RULES if rules is None else rules
     matches: list[RuleMatch] = []
 
     for rule in active_rules:
-        if rule.event_type == event.event_type:
+        if rule.matches(event):
             matches.append(
                 RuleMatch(
                     alert_id=str(uuid4()),
