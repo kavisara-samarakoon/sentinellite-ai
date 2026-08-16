@@ -1,6 +1,6 @@
 # SentinelLite AI
 
-SentinelLite AI is a lightweight Linux endpoint detection and monitoring agent with AI-assisted alert analysis.
+SentinelLite AI is a lightweight Linux endpoint detection and monitoring agent with planned AI-assisted alert analysis.
 
 The project starts as a Python CLI tool focused on defensive Linux security monitoring. It collects security-relevant events, applies transparent detection rules, calculates risk levels, generates JSON reports, and later provides human-readable defensive explanations.
 
@@ -21,7 +21,13 @@ Current prototype status:
 - JSON alert reporter implemented
 - Authentication scan pipeline implemented
 - `scan-auth` CLI command working
-- Unit tests passing
+- Process collector implemented
+- Process observations normalized into security events
+- Sensitive process command-line evidence redacted before reporting
+- Process detection rules implemented
+- Process scan pipeline implemented
+- `scan-process` CLI command working
+- 68 automated tests passing
 
 ## Security Scope
 
@@ -36,7 +42,7 @@ It is intended for:
 - defensive alerting
 - SOC-style investigation practice
 - structured JSON reporting
-- AI-assisted defensive explanation
+- planned AI-assisted defensive explanation
 
 It is not intended for:
 
@@ -57,6 +63,12 @@ It is not intended for:
 - Failed SSH login detection
 - Successful SSH login detection
 - Sudo command usage detection
+- Running process collection
+- Process observation normalization
+- Temporary-path process detection
+- High process resource usage detection
+- Suspicious process keyword detection
+- Process command-line evidence redaction
 - Normalized security event creation
 - Rule-based detection
 - Risk scoring
@@ -65,7 +77,6 @@ It is not intended for:
 
 ## Planned Features
 
-- Process monitoring
 - Network connection monitoring
 - Open port monitoring
 - File integrity monitoring
@@ -128,6 +139,18 @@ Scan a sample authentication log file:
 python -m sentinellite scan-auth examples/auth_logs/sample_auth.log
 ```
 
+Scan the current running process list:
+
+```bash
+python -m sentinellite scan-process
+```
+
+Both scan commands accept an optional output directory:
+
+```bash
+python -m sentinellite scan-process --output-dir reports
+```
+
 Example scan summary:
 
 ```text
@@ -138,6 +161,30 @@ Scored alerts: 4
 JSON report: reports/alerts-...
 ```
 
+Example process scan summary:
+
+```text
+Processes found: 120
+Security events created: 120
+Detection matches: 1
+Scored alerts: 1
+JSON report: reports/alerts-...
+```
+
+## Process Monitoring Pipeline
+
+The process scan follows the same defensive pipeline style as authentication scanning:
+
+```text
+Running process facts
+→ process_observation SecurityEvent
+→ conditional process detection rules
+→ risk scoring
+→ JSON alert report
+```
+
+Process command-line evidence is sanitized before it is added to a security event or report. Known password, token, API key, secret key, and URL credential values are replaced with `[REDACTED]`. SentinelLite AI observes and reports process activity; it does not kill, stop, block, or modify processes.
+
 ## Example Detection Output
 
 Example generated alerts:
@@ -146,6 +193,9 @@ Example generated alerts:
 AUTH-001  MEDIUM (50)  Failed SSH login attempt
 AUTH-002  INFO (20)    Successful SSH login
 AUTH-003  LOW (45)     Sudo command usage
+PROC-001  MEDIUM (60)  Temporary Path Process Execution
+PROC-002  LOW (30)     High Process Resource Usage
+PROC-003  LOW (40)     Suspicious Process Keyword
 ```
 
 ## Reports
@@ -173,6 +223,8 @@ Example report structure:
 
 ## Testing
 
+The current test suite contains 68 tests covering collectors, normalization, detection, scoring, reporting, pipelines, and CLI behavior.
+
 Run all tests:
 
 ```bash
@@ -192,6 +244,7 @@ ruff check src tests
 pytest
 python -m sentinellite
 python -m sentinellite scan-auth examples/auth_logs/sample_auth.log
+python -m sentinellite scan-process
 ```
 
 ## Current Detection Rules
@@ -201,6 +254,11 @@ python -m sentinellite scan-auth examples/auth_logs/sample_auth.log
 | AUTH-001 | Failed SSH Login | Authentication | 50 |
 | AUTH-002 | Successful SSH Login | Authentication | 20 |
 | AUTH-003 | Sudo Command Usage | Privilege Usage | 45 |
+| PROC-001 | Temporary Path Process Execution | Process Execution | 60 |
+| PROC-002 | High Process Resource Usage | Resource Usage | 30 |
+| PROC-003 | Suspicious Process Keyword | Process Behavior | 40 |
+
+Process rules are investigation signals, not proof of compromise. High resource use and command-line keywords can have legitimate explanations and should be reviewed in context.
 
 ## Risk Levels
 
@@ -227,14 +285,16 @@ python -m sentinellite scan-auth examples/auth_logs/sample_auth.log
 ### Version 0.2
 
 - Process collector
-- Network collector
-- File integrity collector
-- Improved detection rules
+- Process event normalization and command-line redaction
+- Conditional process detection rules
+- Process scan pipeline and CLI command
 
 ### Version 0.3
 
 - Linux ARM64 testing
 - Better CLI commands
+- Network collector
+- File integrity collector
 - AI-assisted alert explanation
 - Screenshots and demo evidence
 
