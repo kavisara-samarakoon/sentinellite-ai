@@ -1,5 +1,6 @@
 from collections.abc import Callable
 from dataclasses import dataclass
+from ipaddress import ip_address, ip_network
 
 from sentinellite.models.security_event import SecurityEvent
 
@@ -16,6 +17,15 @@ PROCESS_SUSPICIOUS_KEYWORDS = (
     "socat",
     "http.server",
     "/dev/tcp/",
+)
+NETWORK_EVENT_TYPE = "network_connection_observation"
+COMMON_SAFE_PORTS = frozenset({22, 53, 80, 443})
+SUSPICIOUS_REMOTE_PORTS = frozenset({1337, 4444, 6667, 31337})
+PRIVATE_NETWORKS = (
+    ip_network("10.0.0.0/8"),
+    ip_network("172.16.0.0/12"),
+    ip_network("192.168.0.0/16"),
+    ip_network("fc00::/7"),
 )
 
 
@@ -83,6 +93,58 @@ def matches_suspicious_process_keyword(event: SecurityEvent) -> bool:
     command_text = " ".join(command_parts).lower()
 
     return any(keyword in command_text for keyword in PROCESS_SUSPICIOUS_KEYWORDS)
+
+
+def matches_listening_service_on_unusual_port(event: SecurityEvent) -> bool:
+    """Match listening observations on valid ports outside the common-port set."""
+    status = event.evidence.get("status")
+    local_port = event.evidence.get("local_port")
+
+    return (
+        isinstance(status, str)
+        and status.upper() == "LISTEN"
+        and isinstance(local_port, int)
+        and not isinstance(local_port, bool)
+        and 1 <= local_port <= 65535
+        and local_port not in COMMON_SAFE_PORTS
+    )
+
+
+def matches_external_remote_connection(event: SecurityEvent) -> bool:
+    """Match observations with a valid remote IP outside local address ranges."""
+    remote_address = event.evidence.get("remote_address")
+    if not isinstance(remote_address, str) or not remote_address.strip():
+        return False
+
+    try:
+        remote_ip = ip_address(remote_address.strip())
+    except ValueError:
+        return False
+
+    if (
+        remote_ip.is_loopback
+        or remote_ip.is_link_local
+        or remote_ip.is_unspecified
+        or remote_ip.is_multicast
+        or remote_ip.is_reserved
+    ):
+        return False
+
+    return not any(
+        remote_ip.version == network.version and remote_ip in network
+        for network in PRIVATE_NETWORKS
+    )
+
+
+def matches_suspicious_remote_port(event: SecurityEvent) -> bool:
+    """Match remote ports designated for additional investigation."""
+    remote_port = event.evidence.get("remote_port")
+
+    return (
+        isinstance(remote_port, int)
+        and not isinstance(remote_port, bool)
+        and remote_port in SUSPICIOUS_REMOTE_PORTS
+    )
 
 
 DEFAULT_RULES: list[DetectionRule] = [
@@ -166,5 +228,54 @@ DEFAULT_RULES: list[DetectionRule] = [
             "behavior is authorized. A keyword match alone is not proof of compromise."
         ),
         condition=matches_suspicious_process_keyword,
+    ),
+    DetectionRule(
+        rule_id="NET-001",
+        name="Listening Service on Unusual Port",
+        event_type=NETWORK_EVENT_TYPE,
+        category="network_exposure",
+        severity="medium",
+        base_score=55,
+        description=(
+            "A listening network endpoint was observed on a port outside the common-port set."
+        ),
+        recommendation=(
+            "Confirm that the listening service and port are expected, then review its process "
+            "identity and intended exposure. An unusual port alone does not indicate malicious "
+            "activity."
+        ),
+        condition=matches_listening_service_on_unusual_port,
+    ),
+    DetectionRule(
+        rule_id="NET-002",
+        name="External Remote Connection",
+        event_type=NETWORK_EVENT_TYPE,
+        category="network_connection",
+        severity="low",
+        base_score=35,
+        description=(
+            "A network connection to a remote IP outside local address ranges was observed."
+        ),
+        recommendation=(
+            "Review the remote address, port, process identity, and operational context to "
+            "confirm that the connection is expected. External connectivity alone is not "
+            "evidence of compromise."
+        ),
+        condition=matches_external_remote_connection,
+    ),
+    DetectionRule(
+        rule_id="NET-003",
+        name="Suspicious Remote Port",
+        event_type=NETWORK_EVENT_TYPE,
+        category="network_behavior",
+        severity="low",
+        base_score=40,
+        description="A connection using a remote port designated for investigation was observed.",
+        recommendation=(
+            "Review the connection endpoints and associated process, and verify whether use of "
+            "this remote port is expected. A port match alone does not classify the connection "
+            "as malicious."
+        ),
+        condition=matches_suspicious_remote_port,
     ),
 ]
