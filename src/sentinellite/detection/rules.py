@@ -27,6 +27,7 @@ PRIVATE_NETWORKS = (
     ip_network("192.168.0.0/16"),
     ip_network("fc00::/7"),
 )
+FILE_INTEGRITY_EVENT_TYPE = "file_integrity_observation"
 
 
 @dataclass(frozen=True)
@@ -144,6 +145,26 @@ def matches_suspicious_remote_port(event: SecurityEvent) -> bool:
         isinstance(remote_port, int)
         and not isinstance(remote_port, bool)
         and remote_port in SUSPICIOUS_REMOTE_PORTS
+    )
+
+
+def matches_missing_monitored_file(event: SecurityEvent) -> bool:
+    """Match observations that explicitly report a selected path as absent."""
+    return event.evidence.get("exists") is False
+
+
+def matches_file_integrity_check_error(event: SecurityEvent) -> bool:
+    """Match observations containing a non-empty collection error."""
+    error = event.evidence.get("error")
+
+    return isinstance(error, str) and bool(error.strip())
+
+
+def matches_directory_supplied_for_file_integrity_check(event: SecurityEvent) -> bool:
+    """Match existing selected paths that are explicitly not regular files."""
+    return (
+        event.evidence.get("exists") is True
+        and event.evidence.get("is_file") is False
     )
 
 
@@ -277,5 +298,50 @@ DEFAULT_RULES: list[DetectionRule] = [
             "as malicious."
         ),
         condition=matches_suspicious_remote_port,
+    ),
+    DetectionRule(
+        rule_id="FIM-001",
+        name="Missing Monitored File",
+        event_type=FILE_INTEGRITY_EVENT_TYPE,
+        category="file_integrity",
+        severity="medium",
+        base_score=60,
+        description="A selected file path was reported as absent during this observation.",
+        recommendation=(
+            "Confirm that the path is correct and expected to exist, then review deployment, "
+            "access, and maintenance context. This observation does not establish when or why "
+            "the file became unavailable."
+        ),
+        condition=matches_missing_monitored_file,
+    ),
+    DetectionRule(
+        rule_id="FIM-002",
+        name="File Integrity Check Error",
+        event_type=FILE_INTEGRITY_EVENT_TYPE,
+        category="file_integrity",
+        severity="low",
+        base_score=35,
+        description="A file integrity observation reported a collection or inspection error.",
+        recommendation=(
+            "Review the reported error, selected path, and runtime permissions, then repeat the "
+            "check when appropriate. An observation error alone does not indicate file changes."
+        ),
+        condition=matches_file_integrity_check_error,
+    ),
+    DetectionRule(
+        rule_id="FIM-003",
+        name="Directory Supplied for File Integrity Check",
+        event_type=FILE_INTEGRITY_EVENT_TYPE,
+        category="file_integrity",
+        severity="info",
+        base_score=20,
+        description=(
+            "A selected path was an existing directory and was not hashed as a regular file."
+        ),
+        recommendation=(
+            "Verify that the intended monitored path identifies a regular file. Directory "
+            "contents are not recursively inspected by this check."
+        ),
+        condition=matches_directory_supplied_for_file_integrity_check,
     ),
 ]

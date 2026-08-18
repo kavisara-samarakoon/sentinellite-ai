@@ -118,7 +118,7 @@ def test_net_003_does_not_match_ordinary_remote_port() -> None:
 def test_network_rules_are_registered_without_changing_existing_rules() -> None:
     rule_ids = [rule.rule_id for rule in DEFAULT_RULES]
 
-    assert rule_ids == [
+    assert rule_ids[:9] == [
         "AUTH-001",
         "AUTH-002",
         "AUTH-003",
