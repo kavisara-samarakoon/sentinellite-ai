@@ -4,6 +4,7 @@ import pytest
 from typer.testing import CliRunner
 
 from sentinellite.main import app
+from sentinellite.pipeline.network_scan import NetworkScanSummary
 from sentinellite.pipeline.process_scan import ProcessScanSummary
 
 runner = CliRunner()
@@ -98,3 +99,84 @@ def test_scan_process_command_displays_safe_no_alert_message(
     assert result.exit_code == 0
     assert "Process Scan Complete" in result.stdout
     assert "No process alerts generated." in result.stdout
+
+
+def test_scan_network_command_displays_summary_and_alerts(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / "network-alerts.json"
+
+    def fake_run_network_scan(output_dir: Path) -> NetworkScanSummary:
+        assert output_dir == tmp_path
+        return NetworkScanSummary(
+            connections_count=3,
+            security_events_count=3,
+            detection_matches_count=1,
+            scored_alerts_count=1,
+            report_path=str(report_path),
+        )
+
+    monkeypatch.setattr(
+        "sentinellite.main.run_network_scan",
+        fake_run_network_scan,
+    )
+    monkeypatch.setattr(
+        "sentinellite.main.read_alert_report",
+        lambda _report_path: {
+            "alerts": [
+                {
+                    "rule_id": "NET-001",
+                    "risk_level": "medium",
+                    "risk_score": 55,
+                    "message": (
+                        "Observed network connection at 127.0.0.1:8080 "
+                        "with no remote endpoint"
+                    ),
+                }
+            ]
+        },
+    )
+
+    result = runner.invoke(
+        app,
+        ["scan-network", "--output-dir", str(tmp_path)],
+    )
+
+    assert result.exit_code == 0
+    assert "Network Scan Complete" in result.stdout
+    assert "Connections found" in result.stdout
+    assert "Security events created" in result.stdout
+    assert "Detection matches" in result.stdout
+    assert "Scored alerts" in result.stdout
+    assert "JSON report" in result.stdout
+    assert "NET-001" in result.stdout
+    assert "MEDIUM (55)" in result.stdout
+    assert "Observed network connection at 127.0.0.1:8080" in result.stdout
+
+
+def test_scan_network_command_displays_safe_no_alert_message(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / "network-alerts.json"
+
+    monkeypatch.setattr(
+        "sentinellite.main.run_network_scan",
+        lambda output_dir: NetworkScanSummary(
+            connections_count=1,
+            security_events_count=1,
+            detection_matches_count=0,
+            scored_alerts_count=0,
+            report_path=str(report_path),
+        ),
+    )
+
+    result = runner.invoke(
+        app,
+        ["scan-network", "--output-dir", str(tmp_path)],
+    )
+
+    assert result.exit_code == 0
+    assert "Network Scan Complete" in result.stdout
+    assert "No network alerts generated." in result.stdout
