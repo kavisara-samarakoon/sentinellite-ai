@@ -32,7 +32,12 @@ Current prototype status:
 - Investigation-focused network detection rules implemented
 - Network scan pipeline implemented
 - `scan-network` CLI command working
-- 105 automated tests passing
+- Read-only file integrity collector implemented for explicitly selected paths
+- File integrity observations normalized into security events
+- Investigation-focused file integrity detection rules implemented
+- File integrity scan pipeline implemented
+- `scan-files` CLI command working
+- 135 automated tests passing
 
 ## Security Scope
 
@@ -43,6 +48,7 @@ It is intended for:
 - Linux endpoint monitoring
 - authentication log analysis
 - read-only active network connection observation
+- read-only observation of explicitly selected file paths
 - security learning
 - safe lab testing
 - defensive alerting
@@ -78,6 +84,9 @@ It is not intended for:
 - Active network connection collection
 - Network observation normalization
 - Investigation-focused network connection detection
+- Selected file metadata and SHA-256 collection
+- File integrity observation normalization
+- Investigation-focused file integrity detection
 - Normalized security event creation
 - Rule-based detection
 - Risk scoring
@@ -86,7 +95,7 @@ It is not intended for:
 
 ## Planned Features
 
-- File integrity monitoring
+- Baseline-backed file modification and change detection
 - Improved detection rules
 - AI-assisted alert explanation
 - Linux ARM64 VM testing
@@ -164,6 +173,24 @@ Scan commands accept an optional output directory. For network observations, use
 python -m sentinellite scan-network --output-dir reports
 ```
 
+Observe one explicitly selected file path:
+
+```bash
+python -m sentinellite scan-files README.md
+```
+
+Observe multiple explicitly selected paths:
+
+```bash
+python -m sentinellite scan-files README.md pyproject.toml
+```
+
+Use a specific report output directory:
+
+```bash
+python -m sentinellite scan-files README.md --output-dir reports
+```
+
 For example, process scan output can also be directed to `reports/`:
 
 ```bash
@@ -200,6 +227,16 @@ Scored alerts: 1
 JSON report: reports/alerts-...
 ```
 
+Example file integrity scan summary:
+
+```text
+Files checked: 2
+Security events created: 2
+Detection matches: 0
+Scored alerts: 0
+JSON report: reports/alerts-...
+```
+
 ## Process Monitoring Pipeline
 
 The process scan follows the same defensive pipeline style as authentication scanning:
@@ -228,6 +265,20 @@ Active network connection metadata
 
 Network observations are based on active connection metadata available from the operating system. The rules provide investigation signals and do not classify a connection as malicious. SentinelLite AI does not perform port scanning, send packets, open sockets, or perform DNS lookups as part of this pipeline.
 
+## File Integrity Monitoring Pipeline
+
+The file integrity command uses a read-only observation pipeline for explicitly supplied paths:
+
+```text
+Selected path metadata and SHA-256 hash
+→ file_integrity_observation SecurityEvent
+→ conservative file integrity detection rules
+→ risk scoring
+→ JSON alert report
+```
+
+The collector checks only paths supplied directly to `scan-files`. It does not modify, create, delete, or repair selected files, and it does not recursively scan directories. There is no baseline database yet, so the current implementation does not detect or claim file modification or change; baseline-backed change detection is planned for later development.
+
 ## Example Detection Output
 
 Example generated alerts:
@@ -242,6 +293,9 @@ PROC-003  LOW (40)     Suspicious Process Keyword
 NET-001   MEDIUM (55)  Listening Service on Unusual Port
 NET-002   LOW (35)     External Remote Connection
 NET-003   LOW (40)     Suspicious Remote Port
+FIM-001   MEDIUM (60)  Missing Monitored File
+FIM-002   LOW (35)     File Integrity Check Error
+FIM-003   INFO (20)    Directory Supplied for File Integrity Check
 ```
 
 ## Reports
@@ -269,7 +323,7 @@ Example report structure:
 
 ## Testing
 
-The current test suite contains 105 tests covering collectors, normalization, detection, scoring, reporting, pipelines, and CLI behavior.
+The current test suite contains 135 tests covering collectors, normalization, detection, scoring, reporting, pipelines, and CLI behavior.
 
 Run all tests:
 
@@ -292,6 +346,7 @@ python -m sentinellite
 python -m sentinellite scan-auth examples/auth_logs/sample_auth.log
 python -m sentinellite scan-process
 python -m sentinellite scan-network
+python -m sentinellite scan-files README.md
 ```
 
 ## Current Detection Rules
@@ -307,10 +362,15 @@ python -m sentinellite scan-network
 | NET-001 | Listening Service on Unusual Port | Network Exposure | Medium | 55 |
 | NET-002 | External Remote Connection | Network Connection | Low | 35 |
 | NET-003 | Suspicious Remote Port | Network Behavior | Low | 40 |
+| FIM-001 | Missing Monitored File | File Integrity | Medium | 60 |
+| FIM-002 | File Integrity Check Error | File Integrity | Low | 35 |
+| FIM-003 | Directory Supplied for File Integrity Check | File Integrity | Info | 20 |
 
 Process rules are investigation signals, not proof of compromise. High resource use and command-line keywords can have legitimate explanations and should be reviewed in context.
 
 Network rules are also investigation signals, not proof of compromise. Listening on an unusual port, connecting to an external address, or using a designated remote port may be legitimate and should be reviewed with process and endpoint context.
+
+File integrity rules report current observation conditions such as an absent path, a collection error, or a directory supplied where a file was expected. They do not indicate malware or prove that a file changed.
 
 ## Risk Levels
 
@@ -346,9 +406,12 @@ Network rules are also investigation signals, not proof of compromise. Listening
 - Read-only network connection collector
 - Network event normalization and conservative detection rules
 - Network scan pipeline and CLI command
+- Read-only file integrity collector for explicitly selected paths
+- File integrity event normalization and conservative detection rules
+- File integrity scan pipeline and CLI command
 - Linux ARM64 testing
 - Better CLI commands
-- File integrity collector
+- Baseline-backed file modification and change detection
 - AI-assisted alert explanation
 - Screenshots and demo evidence
 

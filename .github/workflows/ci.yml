@@ -50,3 +50,6 @@ jobs:
 
       - name: Run network observation smoke test
         run: python -m sentinellite scan-network
+
+      - name: Run file integrity observation smoke test
+        run: python -m sentinellite scan-files README.md
