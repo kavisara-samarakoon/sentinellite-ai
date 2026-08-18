@@ -39,6 +39,8 @@ Current prototype status:
 - `scan-files` CLI command working
 - 135 automated tests passing
 
+See [Linux ARM64 validation notes](docs/linux-validation.md).
+
 ## Security Scope
 
 SentinelLite AI is a defensive cybersecurity project.

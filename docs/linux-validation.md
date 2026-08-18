@@ -1,0 +1,103 @@
+# Linux/Ubuntu ARM64 Validation
+
+SentinelLite AI was validated successfully in an Ubuntu ARM64 virtual machine. This document records the observed environment, quality checks, CLI status, and scan summaries from that validation run.
+
+## Validation Result
+
+Result: **Passed**
+
+The application started in its intended Linux runtime mode, all implemented monitoring modules were available, the automated quality checks passed, and each scan command completed successfully.
+
+## Environment
+
+| Field | Observed Value |
+|---|---|
+| Environment | Ubuntu ARM64 VM |
+| Hostname | `KavisaraUbuntuARM64` |
+| Operating system | Linux |
+| Architecture | `aarch64` |
+| Python version | `3.14.4` |
+| Runtime mode | Linux target environment |
+
+## Validated Source State
+
+| Field | Value |
+|---|---|
+| Branch | `main` |
+| Latest commit | `c6854bb Update README and CI for file integrity monitoring` |
+
+## Quality Checks
+
+| Check | Result |
+|---|---|
+| Ruff | Passed |
+| Pytest | 135 passed |
+
+## CLI Status
+
+The default CLI status display reported:
+
+| Module | Status |
+|---|---|
+| Authentication Monitor | Enabled |
+| Process Monitor | Enabled |
+| Network Monitor | Enabled |
+| File Integrity Monitor | Enabled |
+| JSON Reporting | Enabled |
+| AI-Assisted Explanation | Planned |
+
+AI-assisted explanation was not treated as implemented during this validation.
+
+## Scan Validation
+
+### Authentication Scan
+
+| Metric | Observed Value |
+|---|---:|
+| Authentication events found | 4 |
+| Security events created | 4 |
+| Detection matches | 4 |
+| Scored alerts | 4 |
+
+### Process Scan
+
+| Metric | Observed Value |
+|---|---:|
+| Processes found | 194 |
+| Security events created | 194 |
+| Detection matches | 0 |
+| Scored alerts | 0 |
+
+The absence of process alerts indicates that no configured process rule matched the observed process metadata. It is not a broader security guarantee.
+
+### Network Scan
+
+| Metric | Observed Value |
+|---|---:|
+| Connections found | 25 |
+| Security events created | 25 |
+| Detection matches | 13 |
+| Scored alerts | 13 |
+
+Network alerts are expected in a live VM because active network connections exist and may meet investigation-focused rule conditions. These alerts identify observations for review; they do not classify a connection as malicious or claim malware detection.
+
+### File Integrity Scan
+
+| Metric | Observed Value |
+|---|---:|
+| Files checked | 1 |
+| Security events created | 1 |
+| Detection matches | 0 |
+| Scored alerts | 0 |
+
+The file integrity result records the state of the explicitly supplied path during the validation run. No alert means that no configured file integrity rule matched that observation.
+
+## Validation Scope and Limitations
+
+- The validation confirms that SentinelLite AI runs successfully in the tested Ubuntu ARM64 VM environment.
+- Detection results are defensive, investigation-focused signals and are not proof of compromise or malware.
+- AI-assisted explanation remains planned and was not validated as an implemented capability.
+- No private tokens, credentials, or other sensitive values are included in this document.
+- Screenshots are intentionally not included at this stage.
+
+Future validation can extend this record with additional Linux distributions, Python versions, repeatability checks, and screenshots when appropriate.
