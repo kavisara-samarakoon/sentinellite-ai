@@ -16,11 +16,12 @@ def test_default_status_describes_implemented_and_planned_modules() -> None:
     assert result.exit_code == 0
     assert "│ Authentication Monitor  │ Enabled │" in result.stdout
     assert "│ Process Monitor         │ Enabled │" in result.stdout
-    assert "│ Network Monitor         │ Planned │" in result.stdout
+    assert "│ Network Monitor         │ Enabled │" in result.stdout
     assert "│ File Integrity Monitor  │ Planned │" in result.stdout
     assert "│ JSON Reporting          │ Enabled │" in result.stdout
     assert "│ AI-Assisted Explanation │ Planned │" in result.stdout
-    assert result.stdout.count("Not implemented; planned for a future") == 2
+    assert "Monitor active network connections and" in result.stdout
+    assert result.stdout.count("Not implemented; planned for a future") == 1
 
 
 def test_scan_process_command_displays_summary_and_alerts(

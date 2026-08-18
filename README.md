@@ -27,7 +27,12 @@ Current prototype status:
 - Process detection rules implemented
 - Process scan pipeline implemented
 - `scan-process` CLI command working
-- 68 automated tests passing
+- Read-only network connection collector implemented
+- Network observations normalized into security events
+- Investigation-focused network detection rules implemented
+- Network scan pipeline implemented
+- `scan-network` CLI command working
+- 105 automated tests passing
 
 ## Security Scope
 
@@ -37,6 +42,7 @@ It is intended for:
 
 - Linux endpoint monitoring
 - authentication log analysis
+- read-only active network connection observation
 - security learning
 - safe lab testing
 - defensive alerting
@@ -69,6 +75,9 @@ It is not intended for:
 - High process resource usage detection
 - Suspicious process keyword detection
 - Process command-line evidence redaction
+- Active network connection collection
+- Network observation normalization
+- Investigation-focused network connection detection
 - Normalized security event creation
 - Rule-based detection
 - Risk scoring
@@ -77,8 +86,6 @@ It is not intended for:
 
 ## Planned Features
 
-- Network connection monitoring
-- Open port monitoring
 - File integrity monitoring
 - Improved detection rules
 - AI-assisted alert explanation
@@ -145,7 +152,19 @@ Scan the current running process list:
 python -m sentinellite scan-process
 ```
 
-Both scan commands accept an optional output directory:
+Observe active network connections:
+
+```bash
+python -m sentinellite scan-network
+```
+
+Scan commands accept an optional output directory. For network observations, use:
+
+```bash
+python -m sentinellite scan-network --output-dir reports
+```
+
+For example, process scan output can also be directed to `reports/`:
 
 ```bash
 python -m sentinellite scan-process --output-dir reports
@@ -158,6 +177,16 @@ Auth events found: 4
 Security events created: 4
 Detection matches: 4
 Scored alerts: 4
+JSON report: reports/alerts-...
+```
+
+Example network scan summary:
+
+```text
+Connections found: 42
+Security events created: 42
+Detection matches: 1
+Scored alerts: 1
 JSON report: reports/alerts-...
 ```
 
@@ -185,6 +214,20 @@ Running process facts
 
 Process command-line evidence is sanitized before it is added to a security event or report. Known password, token, API key, secret key, and URL credential values are replaced with `[REDACTED]`. SentinelLite AI observes and reports process activity; it does not kill, stop, block, or modify processes.
 
+## Network Monitoring Pipeline
+
+The network command uses a read-only observation pipeline:
+
+```text
+Active network connection metadata
+→ network_connection_observation SecurityEvent
+→ conservative network detection rules
+→ risk scoring
+→ JSON alert report
+```
+
+Network observations are based on active connection metadata available from the operating system. The rules provide investigation signals and do not classify a connection as malicious. SentinelLite AI does not perform port scanning, send packets, open sockets, or perform DNS lookups as part of this pipeline.
+
 ## Example Detection Output
 
 Example generated alerts:
@@ -196,6 +239,9 @@ AUTH-003  LOW (45)     Sudo command usage
 PROC-001  MEDIUM (60)  Temporary Path Process Execution
 PROC-002  LOW (30)     High Process Resource Usage
 PROC-003  LOW (40)     Suspicious Process Keyword
+NET-001   MEDIUM (55)  Listening Service on Unusual Port
+NET-002   LOW (35)     External Remote Connection
+NET-003   LOW (40)     Suspicious Remote Port
 ```
 
 ## Reports
@@ -223,7 +269,7 @@ Example report structure:
 
 ## Testing
 
-The current test suite contains 68 tests covering collectors, normalization, detection, scoring, reporting, pipelines, and CLI behavior.
+The current test suite contains 105 tests covering collectors, normalization, detection, scoring, reporting, pipelines, and CLI behavior.
 
 Run all tests:
 
@@ -245,20 +291,26 @@ pytest
 python -m sentinellite
 python -m sentinellite scan-auth examples/auth_logs/sample_auth.log
 python -m sentinellite scan-process
+python -m sentinellite scan-network
 ```
 
 ## Current Detection Rules
 
-| Rule ID | Name | Category | Base Score |
-|---|---|---|---:|
-| AUTH-001 | Failed SSH Login | Authentication | 50 |
-| AUTH-002 | Successful SSH Login | Authentication | 20 |
-| AUTH-003 | Sudo Command Usage | Privilege Usage | 45 |
-| PROC-001 | Temporary Path Process Execution | Process Execution | 60 |
-| PROC-002 | High Process Resource Usage | Resource Usage | 30 |
-| PROC-003 | Suspicious Process Keyword | Process Behavior | 40 |
+| Rule ID | Name | Category | Severity | Base Score |
+|---|---|---|---|---:|
+| AUTH-001 | Failed SSH Login | Authentication | Medium | 50 |
+| AUTH-002 | Successful SSH Login | Authentication | Low | 20 |
+| AUTH-003 | Sudo Command Usage | Privilege Usage | Medium | 45 |
+| PROC-001 | Temporary Path Process Execution | Process Execution | Medium | 60 |
+| PROC-002 | High Process Resource Usage | Resource Usage | Low | 30 |
+| PROC-003 | Suspicious Process Keyword | Process Behavior | Low | 40 |
+| NET-001 | Listening Service on Unusual Port | Network Exposure | Medium | 55 |
+| NET-002 | External Remote Connection | Network Connection | Low | 35 |
+| NET-003 | Suspicious Remote Port | Network Behavior | Low | 40 |
 
 Process rules are investigation signals, not proof of compromise. High resource use and command-line keywords can have legitimate explanations and should be reviewed in context.
+
+Network rules are also investigation signals, not proof of compromise. Listening on an unusual port, connecting to an external address, or using a designated remote port may be legitimate and should be reviewed with process and endpoint context.
 
 ## Risk Levels
 
@@ -291,9 +343,11 @@ Process rules are investigation signals, not proof of compromise. High resource 
 
 ### Version 0.3
 
+- Read-only network connection collector
+- Network event normalization and conservative detection rules
+- Network scan pipeline and CLI command
 - Linux ARM64 testing
 - Better CLI commands
-- Network collector
 - File integrity collector
 - AI-assisted alert explanation
 - Screenshots and demo evidence

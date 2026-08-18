@@ -80,8 +80,8 @@ def show_modules(config: dict[str, Any]) -> None:
     )
     table.add_row(
         "Network Monitor",
-        format_planned_status(),
-        "Not implemented; planned for a future release",
+        format_status(monitoring["network"]["enabled"]),
+        "Monitor active network connections and investigation-focused network activity",
     )
     table.add_row(
         "File Integrity Monitor",

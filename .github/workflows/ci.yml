@@ -47,3 +47,6 @@ jobs:
 
       - name: Run process scan smoke test
         run: python -m sentinellite scan-process
+
+      - name: Run network observation smoke test
+        run: python -m sentinellite scan-network
