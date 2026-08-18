@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - "feature/**"
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    name: Ruff and Pytest
+    runs-on: ubuntu-latest
+
+    env:
+      PYTHONPATH: src
+      PYTHONDONTWRITEBYTECODE: "1"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Run Ruff
+        run: ruff check src tests
+
+      - name: Run Pytest
+        run: pytest -p no:cacheprovider
+
+      - name: Run CLI status smoke test
+        run: python -m sentinellite
+
+      - name: Run authentication scan smoke test
+        run: python -m sentinellite scan-auth examples/auth_logs/sample_auth.log
+
+      - name: Run process scan smoke test
+        run: python -m sentinellite scan-process
