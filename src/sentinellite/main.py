@@ -53,6 +53,10 @@ def format_status(enabled: bool) -> str:
     return "[red]Disabled[/red]"
 
 
+def format_planned_status() -> str:
+    return "[yellow]Planned[/yellow]"
+
+
 def show_modules(config: dict[str, Any]) -> None:
     monitoring = config["monitoring"]
     reporting = config["reporting"]
@@ -75,13 +79,13 @@ def show_modules(config: dict[str, Any]) -> None:
     )
     table.add_row(
         "Network Monitor",
-        format_status(monitoring["network"]["enabled"]),
-        monitoring["network"].get("description", ""),
+        format_planned_status(),
+        "Not implemented; planned for a future release",
     )
     table.add_row(
         "File Integrity Monitor",
-        format_status(monitoring["file_integrity"]["enabled"]),
-        monitoring["file_integrity"].get("description", ""),
+        format_planned_status(),
+        "Not implemented; planned for a future release",
     )
     table.add_row(
         "JSON Reporting",
@@ -90,7 +94,7 @@ def show_modules(config: dict[str, Any]) -> None:
     )
     table.add_row(
         "AI-Assisted Explanation",
-        format_status(ai_analysis.get("enabled", False)),
+        format_planned_status(),
         ai_analysis.get("note", "Optional explanation layer"),
     )
 
