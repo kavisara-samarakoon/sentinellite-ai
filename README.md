@@ -41,6 +41,8 @@ Current prototype status:
 
 See [Linux ARM64 validation notes](docs/linux-validation.md).
 
+See [the demo guide](docs/demo-guide.md) for a suggested project demonstration flow.
+
 ## Security Scope
 
 SentinelLite AI is a defensive cybersecurity project.
