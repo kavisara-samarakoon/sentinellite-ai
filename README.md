@@ -43,6 +43,8 @@ See [Linux ARM64 validation notes](docs/linux-validation.md).
 
 See [the demo guide](docs/demo-guide.md) for a suggested project demonstration flow.
 
+See the [v0.1.0-alpha release notes](docs/release-notes-v0.1.0-alpha.md).
+
 ## Security Scope
 
 SentinelLite AI is a defensive cybersecurity project.
