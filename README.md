@@ -43,11 +43,13 @@ Current prototype status:
 - `baseline-files` and `scan-files-baseline` CLI commands working
 - 207 automated tests passing
 
-See [Linux ARM64 validation notes](docs/linux-validation.md).
+Baseline-backed file integrity monitoring is implemented and has been validated on Ubuntu ARM64. See the [Linux ARM64 validation notes](docs/linux-validation.md).
 
 See [the demo guide](docs/demo-guide.md) for a suggested project demonstration flow.
 
 See the [v0.1.0-alpha release notes](docs/release-notes-v0.1.0-alpha.md).
+
+See the [v0.2.0-alpha release notes](docs/release-notes-v0.2.0-alpha.md) for the baseline-backed file integrity milestone.
 
 ## Security Scope
 
@@ -121,7 +123,7 @@ It is not intended for:
 
 - Improved detection rules
 - AI-assisted alert explanation
-- Linux ARM64 VM testing
+- Additional Linux environment validation
 - ARM-SecNet integration testing
 - Local dashboard in a later version
 
