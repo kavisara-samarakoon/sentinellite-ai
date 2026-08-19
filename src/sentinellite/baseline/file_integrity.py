@@ -10,6 +10,14 @@ from sentinellite.collectors.file_integrity import FileIntegrityRecord
 
 BASELINE_VERSION = 1
 
+COMPARISON_UNCHANGED = "unchanged"
+COMPARISON_CHANGED = "changed"
+COMPARISON_MISSING_NOW = "missing_now"
+COMPARISON_APPEARED_NOW = "appeared_now"
+COMPARISON_NOT_IN_BASELINE = "not_in_baseline"
+COMPARISON_TYPE_CHANGED = "type_changed"
+COMPARISON_CURRENT_ERROR = "current_error"
+
 
 def _missing_fields(data: Mapping[str, object], required_fields: set[str]) -> list[str]:
     return sorted(required_fields.difference(data))
@@ -138,6 +146,30 @@ class FileIntegrityBaseline:
         return cls(version=version, created_at=created_at, entries=entries)
 
 
+@dataclass(frozen=True, slots=True)
+class FileIntegrityBaselineComparison:
+    """Investigation-focused result from comparing one observation with a baseline."""
+
+    path: str
+    status: str
+    changed_fields: list[str]
+    baseline_entry: FileIntegrityBaselineEntry | None
+    current_entry: FileIntegrityBaselineEntry
+    message: str
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "path": self.path,
+            "status": self.status,
+            "changed_fields": list(self.changed_fields),
+            "baseline_entry": (
+                self.baseline_entry.to_dict() if self.baseline_entry is not None else None
+            ),
+            "current_entry": self.current_entry.to_dict(),
+            "message": self.message,
+        }
+
+
 def create_baseline_from_records(
     records: Sequence[FileIntegrityRecord],
     created_at: str | None = None,
@@ -184,3 +216,129 @@ def load_baseline(path: Path | str) -> FileIntegrityBaseline:
         raise ValueError("Baseline JSON must contain an object.")  # noqa: TRY004
 
     return FileIntegrityBaseline.from_dict(data)
+
+
+def _entry_from_record(record: FileIntegrityRecord) -> FileIntegrityBaselineEntry:
+    return FileIntegrityBaselineEntry(
+        path=record.path,
+        exists=record.exists,
+        is_file=record.is_file,
+        size_bytes=record.size_bytes,
+        modified_time_epoch=record.modified_time_epoch,
+        sha256=record.sha256,
+        error=record.error,
+    )
+
+
+def _index_baseline_entries(
+    baseline: FileIntegrityBaseline,
+) -> dict[str, FileIntegrityBaselineEntry]:
+    entries_by_path: dict[str, FileIntegrityBaselineEntry] = {}
+
+    for entry in baseline.entries:
+        if entry.path in entries_by_path:
+            raise ValueError(f"Duplicate path in file integrity baseline: {entry.path}")
+        entries_by_path[entry.path] = entry
+
+    return entries_by_path
+
+
+def _compare_record_with_index(
+    record: FileIntegrityRecord,
+    entries_by_path: Mapping[str, FileIntegrityBaselineEntry],
+) -> FileIntegrityBaselineComparison:
+    current_entry = _entry_from_record(record)
+    baseline_entry = entries_by_path.get(record.path)
+
+    if baseline_entry is None:
+        return FileIntegrityBaselineComparison(
+            path=record.path,
+            status=COMPARISON_NOT_IN_BASELINE,
+            changed_fields=[],
+            baseline_entry=None,
+            current_entry=current_entry,
+            message=f"File was not present in the baseline: {record.path}",
+        )
+
+    if record.error:
+        return FileIntegrityBaselineComparison(
+            path=record.path,
+            status=COMPARISON_CURRENT_ERROR,
+            changed_fields=["error"],
+            baseline_entry=baseline_entry,
+            current_entry=current_entry,
+            message=f"File integrity check had an error for {record.path}",
+        )
+
+    if baseline_entry.exists and not record.exists:
+        return FileIntegrityBaselineComparison(
+            path=record.path,
+            status=COMPARISON_MISSING_NOW,
+            changed_fields=["exists"],
+            baseline_entry=baseline_entry,
+            current_entry=current_entry,
+            message=f"File missing compared with baseline: {record.path}",
+        )
+
+    if not baseline_entry.exists and record.exists:
+        return FileIntegrityBaselineComparison(
+            path=record.path,
+            status=COMPARISON_APPEARED_NOW,
+            changed_fields=["exists"],
+            baseline_entry=baseline_entry,
+            current_entry=current_entry,
+            message=f"File appeared compared with baseline: {record.path}",
+        )
+
+    if baseline_entry.is_file != record.is_file:
+        return FileIntegrityBaselineComparison(
+            path=record.path,
+            status=COMPARISON_TYPE_CHANGED,
+            changed_fields=["is_file"],
+            baseline_entry=baseline_entry,
+            current_entry=current_entry,
+            message=f"File type changed compared with baseline: {record.path}",
+        )
+
+    changed_fields = []
+    if baseline_entry.exists and record.exists and baseline_entry.is_file and record.is_file:
+        changed_fields = [
+            field_name
+            for field_name in ("size_bytes", "modified_time_epoch", "sha256")
+            if getattr(baseline_entry, field_name) != getattr(current_entry, field_name)
+        ]
+    if changed_fields:
+        return FileIntegrityBaselineComparison(
+            path=record.path,
+            status=COMPARISON_CHANGED,
+            changed_fields=changed_fields,
+            baseline_entry=baseline_entry,
+            current_entry=current_entry,
+            message=f"File changed compared with baseline: {record.path}",
+        )
+
+    return FileIntegrityBaselineComparison(
+        path=record.path,
+        status=COMPARISON_UNCHANGED,
+        changed_fields=[],
+        baseline_entry=baseline_entry,
+        current_entry=current_entry,
+        message=f"File matches baseline: {record.path}",
+    )
+
+
+def compare_record_to_baseline(
+    record: FileIntegrityRecord,
+    baseline: FileIntegrityBaseline,
+) -> FileIntegrityBaselineComparison:
+    """Compare one existing observation with an unambiguous baseline."""
+    return _compare_record_with_index(record, _index_baseline_entries(baseline))
+
+
+def compare_records_to_baseline(
+    records: Sequence[FileIntegrityRecord],
+    baseline: FileIntegrityBaseline,
+) -> list[FileIntegrityBaselineComparison]:
+    """Compare observations with a baseline while preserving their input order."""
+    entries_by_path = _index_baseline_entries(baseline)
+    return [_compare_record_with_index(record, entries_by_path) for record in records]
