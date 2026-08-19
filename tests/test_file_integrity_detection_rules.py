@@ -148,4 +148,9 @@ def test_file_integrity_rules_are_registered_after_existing_rules() -> None:
         "FIM-001",
         "FIM-002",
         "FIM-003",
+        "FIM-004",
+        "FIM-005",
+        "FIM-006",
+        "FIM-007",
+        "FIM-008",
     ]

@@ -28,6 +28,7 @@ PRIVATE_NETWORKS = (
     ip_network("fc00::/7"),
 )
 FILE_INTEGRITY_EVENT_TYPE = "file_integrity_observation"
+FILE_INTEGRITY_BASELINE_EVENT_TYPE = "file_integrity_baseline_comparison"
 
 
 @dataclass(frozen=True)
@@ -166,6 +167,31 @@ def matches_directory_supplied_for_file_integrity_check(event: SecurityEvent) ->
         event.evidence.get("exists") is True
         and event.evidence.get("is_file") is False
     )
+
+
+def matches_file_changed_compared_with_baseline(event: SecurityEvent) -> bool:
+    """Match baseline comparisons that report changed file metadata or content."""
+    return event.evidence.get("status") == "changed"
+
+
+def matches_file_missing_compared_with_baseline(event: SecurityEvent) -> bool:
+    """Match baseline comparisons that report a previously observed file as absent."""
+    return event.evidence.get("status") == "missing_now"
+
+
+def matches_file_appeared_compared_with_baseline(event: SecurityEvent) -> bool:
+    """Match baseline comparisons that report a previously absent file as present."""
+    return event.evidence.get("status") == "appeared_now"
+
+
+def matches_file_type_changed_compared_with_baseline(event: SecurityEvent) -> bool:
+    """Match baseline comparisons that report a monitored path type change."""
+    return event.evidence.get("status") == "type_changed"
+
+
+def matches_file_integrity_baseline_comparison_error(event: SecurityEvent) -> bool:
+    """Match baseline comparisons that report a current observation error."""
+    return event.evidence.get("status") == "current_error"
 
 
 DEFAULT_RULES: list[DetectionRule] = [
@@ -343,5 +369,77 @@ DEFAULT_RULES: list[DetectionRule] = [
             "contents are not recursively inspected by this check."
         ),
         condition=matches_directory_supplied_for_file_integrity_check,
+    ),
+    DetectionRule(
+        rule_id="FIM-004",
+        name="File Changed Compared With Baseline",
+        event_type=FILE_INTEGRITY_BASELINE_EVENT_TYPE,
+        category="file_integrity_baseline",
+        severity="medium",
+        base_score=70,
+        description=(
+            "A file's current metadata or hash differs from its saved file integrity baseline."
+        ),
+        recommendation=(
+            "Review recent legitimate updates, deployments, and package changes, and investigate "
+            "whether unauthorized modification is possible."
+        ),
+        condition=matches_file_changed_compared_with_baseline,
+    ),
+    DetectionRule(
+        rule_id="FIM-005",
+        name="File Missing Compared With Baseline",
+        event_type=FILE_INTEGRITY_BASELINE_EVENT_TYPE,
+        category="file_integrity_baseline",
+        severity="medium",
+        base_score=65,
+        description="A file recorded in the baseline was absent from the current observation.",
+        recommendation=(
+            "Confirm whether the file was intentionally removed, moved, renamed, or affected by "
+            "an expected deployment or maintenance activity."
+        ),
+        condition=matches_file_missing_compared_with_baseline,
+    ),
+    DetectionRule(
+        rule_id="FIM-006",
+        name="File Appeared Compared With Baseline",
+        event_type=FILE_INTEGRITY_BASELINE_EVENT_TYPE,
+        category="file_integrity_baseline",
+        severity="low",
+        base_score=35,
+        description="A file absent from the baseline was present in the current observation.",
+        recommendation=(
+            "Confirm whether the file creation is expected and consistent with authorized "
+            "application, deployment, or maintenance activity."
+        ),
+        condition=matches_file_appeared_compared_with_baseline,
+    ),
+    DetectionRule(
+        rule_id="FIM-007",
+        name="File Type Changed Compared With Baseline",
+        event_type=FILE_INTEGRITY_BASELINE_EVENT_TYPE,
+        category="file_integrity_baseline",
+        severity="medium",
+        base_score=60,
+        description="A monitored path's file type differs from its saved baseline entry.",
+        recommendation=(
+            "Review whether the monitored path intentionally changed from a regular file to a "
+            "directory or another path type."
+        ),
+        condition=matches_file_type_changed_compared_with_baseline,
+    ),
+    DetectionRule(
+        rule_id="FIM-008",
+        name="File Integrity Baseline Comparison Error",
+        event_type=FILE_INTEGRITY_BASELINE_EVENT_TYPE,
+        category="file_integrity_baseline",
+        severity="low",
+        base_score=35,
+        description="A current file observation reported an error during baseline comparison.",
+        recommendation=(
+            "Review runtime permissions, path availability, and reported read or inspection "
+            "errors, then repeat the observation when appropriate."
+        ),
+        condition=matches_file_integrity_baseline_comparison_error,
     ),
 ]
