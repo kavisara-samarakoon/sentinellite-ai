@@ -417,4 +417,6 @@ def test_scan_files_baseline_missing_file_fails_cleanly(tmp_path: Path) -> None:
     )
 
     assert result.exit_code == 1
-    assert "missing-baseline.json" in result.stdout
+    normalized_stdout = result.stdout.replace("\n", "")
+    assert "missing-baseline.json" in normalized_stdout
+    assert "No such file or directory" in result.stdout
