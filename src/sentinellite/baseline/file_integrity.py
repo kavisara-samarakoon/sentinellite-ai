@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from pathlib import Path
 
 from sentinellite.collectors.file_integrity import FileIntegrityRecord
 
@@ -159,3 +161,26 @@ def create_baseline_from_records(
         created_at=created_at if created_at is not None else datetime.now(UTC).isoformat(),
         entries=entries,
     )
+
+
+def save_baseline(baseline: FileIntegrityBaseline, path: Path | str) -> Path:
+    """Save a baseline as readable JSON at an explicitly supplied path."""
+    baseline_path = Path(path)
+
+    with baseline_path.open("w", encoding="utf-8") as file:
+        json.dump(baseline.to_dict(), file, indent=2)
+
+    return baseline_path
+
+
+def load_baseline(path: Path | str) -> FileIntegrityBaseline:
+    """Load and validate a baseline from an explicitly supplied JSON path."""
+    baseline_path = Path(path)
+
+    with baseline_path.open("r", encoding="utf-8") as file:
+        data = json.load(file)
+
+    if not isinstance(data, Mapping):
+        raise ValueError("Baseline JSON must contain an object.")  # noqa: TRY004
+
+    return FileIntegrityBaseline.from_dict(data)
