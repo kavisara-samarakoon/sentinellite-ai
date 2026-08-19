@@ -9,6 +9,10 @@ from rich.table import Table
 from sentinellite.collectors.system import SystemInfo, collect_system_info
 from sentinellite.config.loader import ConfigError, load_config
 from sentinellite.pipeline.auth_scan import run_auth_scan
+from sentinellite.pipeline.file_integrity_baseline_scan import (
+    create_file_integrity_baseline,
+    run_file_integrity_baseline_scan,
+)
 from sentinellite.pipeline.file_integrity_scan import run_file_integrity_scan
 from sentinellite.pipeline.network_scan import run_network_scan
 from sentinellite.pipeline.process_scan import run_process_scan
@@ -339,6 +343,129 @@ def scan_files_command(
         console.print(alert_table)
     else:
         console.print("[green][+] No file integrity alerts generated.[/green]")
+
+
+@app.command("baseline-files")
+def baseline_files_command(
+    paths: Annotated[
+        list[Path],
+        typer.Argument(help="One or more explicit file paths to record in the baseline."),
+    ],
+    baseline_path: Annotated[
+        Path,
+        typer.Option(
+            "--baseline-path",
+            help="Explicit JSON file path for the file integrity baseline.",
+        ),
+    ],
+) -> None:
+    """Create a file integrity baseline for explicitly selected paths."""
+    try:
+        summary = create_file_integrity_baseline(
+            paths=[str(path) for path in paths],
+            baseline_path=baseline_path,
+        )
+    except FileNotFoundError as error:
+        console.print(f"[red][!] {error}[/red]")
+        raise typer.Exit(code=1) from error
+
+    console.print(
+        Panel.fit(
+            "File Integrity Baseline Created",
+            title="SentinelLite AI",
+            border_style="green",
+        )
+    )
+
+    table = Table(title="File Integrity Baseline Summary")
+    table.add_column("Metric", style="bold")
+    table.add_column("Value")
+
+    table.add_row("Files checked", str(summary.files_checked_count))
+    table.add_row("Baseline entries", str(summary.baseline_entries_count))
+    table.add_row("Baseline JSON path", str(summary.baseline_path))
+
+    console.print(table)
+    console.print(
+        f"[green][+] Baseline JSON path:[/green] {summary.baseline_path}",
+        soft_wrap=True,
+    )
+
+
+@app.command("scan-files-baseline")
+def scan_files_baseline_command(
+    baseline_path: Annotated[
+        Path,
+        typer.Option(
+            "--baseline-path",
+            help="Path to an existing file integrity baseline JSON file.",
+        ),
+    ],
+    output_dir: Annotated[
+        Path,
+        typer.Option(
+            "--output-dir",
+            help="Directory for the generated JSON alert report.",
+        ),
+    ] = Path("reports"),
+) -> None:
+    """Scan the exact paths stored in a file integrity baseline."""
+    try:
+        summary = run_file_integrity_baseline_scan(
+            baseline_path=baseline_path,
+            output_dir=output_dir,
+        )
+    except FileNotFoundError as error:
+        console.print(f"[red][!] {error}[/red]")
+        raise typer.Exit(code=1) from error
+
+    console.print(
+        Panel.fit(
+            "File Integrity Baseline Scan Complete",
+            title="SentinelLite AI",
+            border_style="green",
+        )
+    )
+
+    table = Table(title="File Integrity Baseline Scan Summary")
+    table.add_column("Metric", style="bold")
+    table.add_column("Value")
+
+    table.add_row("Baseline path", str(summary.baseline_path))
+    table.add_row("Files checked", str(summary.files_checked_count))
+    table.add_row("Comparisons", str(summary.comparisons_count))
+    table.add_row("Security events", str(summary.security_events_count))
+    table.add_row("Detection matches", str(summary.detection_matches_count))
+    table.add_row("Scored alerts", str(summary.scored_alerts_count))
+    table.add_row("JSON report path", str(summary.report_path))
+
+    console.print(table)
+    console.print(
+        f"[green][+] JSON report path:[/green] {summary.report_path}",
+        soft_wrap=True,
+    )
+
+    if summary.scored_alerts_count:
+        report = read_alert_report(summary.report_path)
+        alerts = report.get("alerts", [])
+
+        alert_table = Table(title="Generated Alerts")
+        alert_table.add_column("Rule ID", style="bold")
+        alert_table.add_column("Risk")
+        alert_table.add_column("Message")
+
+        for alert in alerts:
+            risk_level = str(alert.get("risk_level", "unknown")).upper()
+            risk_score = alert.get("risk_score", "?")
+            alert_table.add_row(
+                str(alert.get("rule_id", "unknown")),
+                f"{risk_level} ({risk_score})",
+                str(alert.get("message", "")),
+            )
+
+        console.print(alert_table)
+    else:
+        console.print("[green][+] No baseline file integrity alerts generated.[/green]")
 
 
 if __name__ == "__main__":

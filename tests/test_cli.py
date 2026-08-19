@@ -292,3 +292,129 @@ def test_scan_files_command_requires_explicit_path() -> None:
 
     assert result.exit_code != 0
     assert "Missing argument 'paths'" in result.stderr
+
+
+def test_baseline_files_command_creates_json_and_displays_summary(tmp_path: Path) -> None:
+    first_path = tmp_path / "first.txt"
+    second_path = tmp_path / "second.txt"
+    first_path.write_text("first", encoding="utf-8")
+    second_path.write_text("second", encoding="utf-8")
+    baseline_path = tmp_path / "file-integrity-baseline.json"
+
+    result = runner.invoke(
+        app,
+        [
+            "baseline-files",
+            str(first_path),
+            str(second_path),
+            "--baseline-path",
+            str(baseline_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert baseline_path.exists()
+    assert "File Integrity Baseline Created" in result.stdout
+    assert "Files checked" in result.stdout
+    assert "Baseline entries" in result.stdout
+    assert "Baseline JSON path" in result.stdout
+    assert "file-integrity-baseline.json" in result.stdout
+    assert sorted(path.name for path in tmp_path.iterdir()) == [
+        "file-integrity-baseline.json",
+        "first.txt",
+        "second.txt",
+    ]
+
+
+def test_scan_files_baseline_unchanged_writes_report_and_displays_summary(
+    tmp_path: Path,
+) -> None:
+    monitored_path = tmp_path / "unchanged.txt"
+    monitored_path.write_text("unchanged", encoding="utf-8")
+    baseline_path = tmp_path / "baseline.json"
+    output_dir = tmp_path / "reports"
+    create_result = runner.invoke(
+        app,
+        [
+            "baseline-files",
+            str(monitored_path),
+            "--baseline-path",
+            str(baseline_path),
+        ],
+    )
+    assert create_result.exit_code == 0
+
+    result = runner.invoke(
+        app,
+        [
+            "scan-files-baseline",
+            "--baseline-path",
+            str(baseline_path),
+            "--output-dir",
+            str(output_dir),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert len(list(output_dir.glob("*.json"))) == 1
+    assert "File Integrity Baseline Scan Complete" in result.stdout
+    assert "Baseline path" in result.stdout
+    assert "Files checked" in result.stdout
+    assert "Comparisons" in result.stdout
+    assert "Security events" in result.stdout
+    assert "Detection matches" in result.stdout
+    assert "Scored alerts" in result.stdout
+    assert "JSON report path" in result.stdout
+    assert "No baseline file integrity alerts generated." in result.stdout
+
+
+def test_scan_files_baseline_displays_alert_after_file_changes(tmp_path: Path) -> None:
+    monitored_path = tmp_path / "changed.txt"
+    monitored_path.write_text("original", encoding="utf-8")
+    baseline_path = tmp_path / "baseline.json"
+    output_dir = tmp_path / "reports"
+    create_result = runner.invoke(
+        app,
+        [
+            "baseline-files",
+            str(monitored_path),
+            "--baseline-path",
+            str(baseline_path),
+        ],
+    )
+    assert create_result.exit_code == 0
+    monitored_path.write_text("changed content", encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        [
+            "scan-files-baseline",
+            "--baseline-path",
+            str(baseline_path),
+            "--output-dir",
+            str(output_dir),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "FIM-004" in result.stdout
+    assert "MEDIUM (70)" in result.stdout
+    assert "File changed compared with baseline" in result.stdout
+
+
+def test_scan_files_baseline_missing_file_fails_cleanly(tmp_path: Path) -> None:
+    missing_baseline_path = tmp_path / "missing-baseline.json"
+
+    result = runner.invoke(
+        app,
+        [
+            "scan-files-baseline",
+            "--baseline-path",
+            str(missing_baseline_path),
+            "--output-dir",
+            str(tmp_path / "reports"),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "missing-baseline.json" in result.stdout
