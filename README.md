@@ -37,7 +37,11 @@ Current prototype status:
 - Investigation-focused file integrity detection rules implemented
 - File integrity scan pipeline implemented
 - `scan-files` CLI command working
-- 135 automated tests passing
+- Versioned file integrity baseline model and JSON persistence implemented
+- Baseline-backed file comparison, event normalization, detection, and risk scoring implemented
+- File integrity baseline creation and scan pipelines implemented
+- `baseline-files` and `scan-files-baseline` CLI commands working
+- 207 automated tests passing
 
 See [Linux ARM64 validation notes](docs/linux-validation.md).
 
@@ -55,6 +59,7 @@ It is intended for:
 - authentication log analysis
 - read-only active network connection observation
 - read-only observation of explicitly selected file paths
+- baseline-backed file integrity monitoring for explicitly selected paths
 - security learning
 - safe lab testing
 - defensive alerting
@@ -72,6 +77,15 @@ It is not intended for:
 - persistence payloads
 - destructive automation
 - harmful offensive activity
+
+### Safety Boundaries
+
+- File integrity monitoring uses explicit paths only and does not recursively scan directories.
+- SentinelLite AI does not send packets or perform port scanning.
+- The project contains no exploit code or malware functionality.
+- It does not create, delete, repair, or modify monitored files.
+- `baseline-files` writes only the explicitly requested baseline JSON file.
+- `scan-files-baseline` writes only its JSON alert report.
 
 ## Implemented Features
 
@@ -93,6 +107,10 @@ It is not intended for:
 - Selected file metadata and SHA-256 collection
 - File integrity observation normalization
 - Investigation-focused file integrity detection
+- File integrity baseline creation and JSON persistence
+- Baseline-backed file comparison and event normalization
+- Baseline-backed file integrity detection rules
+- Baseline-backed file integrity scan pipeline
 - Normalized security event creation
 - Rule-based detection
 - Risk scoring
@@ -101,7 +119,6 @@ It is not intended for:
 
 ## Planned Features
 
-- Baseline-backed file modification and change detection
 - Improved detection rules
 - AI-assisted alert explanation
 - Linux ARM64 VM testing
@@ -197,6 +214,26 @@ Use a specific report output directory:
 python -m sentinellite scan-files README.md --output-dir reports
 ```
 
+Create a trusted baseline from explicitly selected files:
+
+```bash
+python -m sentinellite baseline-files README.md pyproject.toml --baseline-path file-integrity-baseline.json
+```
+
+Later, scan the exact paths stored in the saved baseline:
+
+```bash
+python -m sentinellite scan-files-baseline --baseline-path file-integrity-baseline.json
+```
+
+Use a custom alert report directory for a baseline-backed scan:
+
+```bash
+python -m sentinellite scan-files-baseline --baseline-path file-integrity-baseline.json --output-dir reports
+```
+
+The baseline workflow starts by recording a trusted state for selected paths. A later scan observes those same paths and compares their current state with the saved baseline. Changed, missing, appeared, type-changed, and observation-error states become investigation signals. Unchanged files still produce comparison events but do not create alerts. The `not_in_baseline` comparison status is retained as context and is not currently an alert.
+
 For example, process scan output can also be directed to `reports/`:
 
 ```bash
@@ -273,7 +310,7 @@ Network observations are based on active connection metadata available from the 
 
 ## File Integrity Monitoring Pipeline
 
-The file integrity command uses a read-only observation pipeline for explicitly supplied paths:
+The standard file integrity command uses a read-only observation pipeline for explicitly supplied paths:
 
 ```text
 Selected path metadata and SHA-256 hash
@@ -283,7 +320,19 @@ Selected path metadata and SHA-256 hash
 → JSON alert report
 ```
 
-The collector checks only paths supplied directly to `scan-files`. It does not modify, create, delete, or repair selected files, and it does not recursively scan directories. There is no baseline database yet, so the current implementation does not detect or claim file modification or change; baseline-backed change detection is planned for later development.
+The baseline-backed workflow adds saved-state comparison without changing the collector's read-only behavior:
+
+```text
+Explicitly selected path observations
+→ versioned baseline JSON
+→ later observations of the exact baseline paths
+→ file_integrity_baseline_comparison SecurityEvent
+→ investigation-focused baseline detection rules
+→ risk scoring
+→ JSON alert report
+```
+
+The collector checks only paths supplied directly to `scan-files` or paths stored in an explicitly supplied baseline. It does not modify, create, delete, or repair monitored files, and it does not recursively scan directories. `baseline-files` writes only the baseline JSON file. `scan-files-baseline` writes only the JSON alert report. Baseline alerts identify changes for investigation and do not classify files as malware or automatically label activity as malicious.
 
 ## Example Detection Output
 
@@ -302,6 +351,11 @@ NET-003   LOW (40)     Suspicious Remote Port
 FIM-001   MEDIUM (60)  Missing Monitored File
 FIM-002   LOW (35)     File Integrity Check Error
 FIM-003   INFO (20)    Directory Supplied for File Integrity Check
+FIM-004   MEDIUM (70)  File Changed Compared With Baseline
+FIM-005   MEDIUM (65)  File Missing Compared With Baseline
+FIM-006   LOW (35)     File Appeared Compared With Baseline
+FIM-007   MEDIUM (60)  File Type Changed Compared With Baseline
+FIM-008   LOW (35)     File Integrity Baseline Comparison Error
 ```
 
 ## Reports
@@ -329,7 +383,7 @@ Example report structure:
 
 ## Testing
 
-The current test suite contains 135 tests covering collectors, normalization, detection, scoring, reporting, pipelines, and CLI behavior.
+The current test suite contains 207 tests covering collectors, baseline models and persistence, normalization, detection, scoring, reporting, pipelines, and CLI behavior.
 
 Run all tests:
 
@@ -353,6 +407,8 @@ python -m sentinellite scan-auth examples/auth_logs/sample_auth.log
 python -m sentinellite scan-process
 python -m sentinellite scan-network
 python -m sentinellite scan-files README.md
+python -m sentinellite baseline-files README.md pyproject.toml --baseline-path file-integrity-baseline.json
+python -m sentinellite scan-files-baseline --baseline-path file-integrity-baseline.json
 ```
 
 ## Current Detection Rules
@@ -371,12 +427,17 @@ python -m sentinellite scan-files README.md
 | FIM-001 | Missing Monitored File | File Integrity | Medium | 60 |
 | FIM-002 | File Integrity Check Error | File Integrity | Low | 35 |
 | FIM-003 | Directory Supplied for File Integrity Check | File Integrity | Info | 20 |
+| FIM-004 | File Changed Compared With Baseline | File Integrity Baseline | Medium | 70 |
+| FIM-005 | File Missing Compared With Baseline | File Integrity Baseline | Medium | 65 |
+| FIM-006 | File Appeared Compared With Baseline | File Integrity Baseline | Low | 35 |
+| FIM-007 | File Type Changed Compared With Baseline | File Integrity Baseline | Medium | 60 |
+| FIM-008 | File Integrity Baseline Comparison Error | File Integrity Baseline | Low | 35 |
 
 Process rules are investigation signals, not proof of compromise. High resource use and command-line keywords can have legitimate explanations and should be reviewed in context.
 
 Network rules are also investigation signals, not proof of compromise. Listening on an unusual port, connecting to an external address, or using a designated remote port may be legitimate and should be reviewed with process and endpoint context.
 
-File integrity rules report current observation conditions such as an absent path, a collection error, or a directory supplied where a file was expected. They do not indicate malware or prove that a file changed.
+File integrity rules report current observation conditions such as an absent path, a collection error, or a directory supplied where a file was expected. Baseline rules additionally report changed, missing, appeared, type-changed, and current-error states compared with a saved baseline. Unchanged and `not_in_baseline` statuses do not produce alerts. These rules provide investigation signals; they do not indicate malware, prove compromise, or establish that a change was unauthorized.
 
 ## Risk Levels
 
@@ -417,7 +478,7 @@ File integrity rules report current observation conditions such as an absent pat
 - File integrity scan pipeline and CLI command
 - Linux ARM64 testing
 - Better CLI commands
-- Baseline-backed file modification and change detection
+- Baseline-backed file integrity creation, comparison, detection, reporting, and CLI workflow
 - AI-assisted alert explanation
 - Screenshots and demo evidence
 

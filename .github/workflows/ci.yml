@@ -53,3 +53,9 @@ jobs:
 
       - name: Run file integrity observation smoke test
         run: python -m sentinellite scan-files README.md
+
+      - name: Run file integrity baseline creation smoke test
+        run: python -m sentinellite baseline-files README.md pyproject.toml --baseline-path file-integrity-baseline.json
+
+      - name: Run file integrity baseline scan smoke test
+        run: python -m sentinellite scan-files-baseline --baseline-path file-integrity-baseline.json
