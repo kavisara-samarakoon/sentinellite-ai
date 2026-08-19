@@ -131,12 +131,14 @@ def test_compare_file_missing_now() -> None:
             size_bytes=None,
             modified_time_epoch=None,
             sha256=None,
+            error="Path does not exist: README.md",
         ),
         create_baseline(),
     )
 
     assert result.status == COMPARISON_MISSING_NOW
     assert result.changed_fields == ["exists"]
+    assert result.current_entry.error == "Path does not exist: README.md"
     assert result.message == "File missing compared with baseline: README.md"
 
 

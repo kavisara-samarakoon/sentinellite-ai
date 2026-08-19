@@ -260,16 +260,6 @@ def _compare_record_with_index(
             message=f"File was not present in the baseline: {record.path}",
         )
 
-    if record.error:
-        return FileIntegrityBaselineComparison(
-            path=record.path,
-            status=COMPARISON_CURRENT_ERROR,
-            changed_fields=["error"],
-            baseline_entry=baseline_entry,
-            current_entry=current_entry,
-            message=f"File integrity check had an error for {record.path}",
-        )
-
     if baseline_entry.exists and not record.exists:
         return FileIntegrityBaselineComparison(
             path=record.path,
@@ -288,6 +278,16 @@ def _compare_record_with_index(
             baseline_entry=baseline_entry,
             current_entry=current_entry,
             message=f"File appeared compared with baseline: {record.path}",
+        )
+
+    if record.error:
+        return FileIntegrityBaselineComparison(
+            path=record.path,
+            status=COMPARISON_CURRENT_ERROR,
+            changed_fields=["error"],
+            baseline_entry=baseline_entry,
+            current_entry=current_entry,
+            message=f"File integrity check had an error for {record.path}",
         )
 
     if baseline_entry.is_file != record.is_file:
