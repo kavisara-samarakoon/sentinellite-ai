@@ -1,3 +1,9 @@
+from sentinellite.explanations.generator import (
+    explanation_to_dict,
+    explanations_to_dicts,
+    generate_alert_explanation,
+    generate_alert_explanations,
+)
 from sentinellite.explanations.models import (
     ALLOWED_CONFIDENCE_VALUES,
     AlertExplanation,
@@ -15,5 +21,9 @@ __all__ = [
     "AlertExplanation",
     "AlertExplanationTemplate",
     "build_generic_explanation",
+    "explanation_to_dict",
+    "explanations_to_dicts",
+    "generate_alert_explanation",
+    "generate_alert_explanations",
     "get_explanation_template",
 ]
