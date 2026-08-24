@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This guide provides a safe, professional flow for demonstrating the current SentinelLite AI `v0.1.0` prototype. The demonstration focuses on implemented defensive monitoring capabilities, transparent detection results, and the project's current limitations.
+This guide provides a safe, professional flow for demonstrating the SentinelLite AI `v0.3.0-alpha` in-development milestone. The demonstration focuses on implemented defensive monitoring, transparent detection results, local deterministic alert explanations, and the project's current limitations.
 
 ## Demo Environment
 
@@ -54,7 +54,7 @@ Display the application status and the availability of each monitoring module:
 python -m sentinellite
 ```
 
-Use this output to introduce the current prototype and distinguish implemented monitoring features from planned AI-assisted explanation.
+Use this output to introduce the current milestone and distinguish implemented deterministic explanation templates from future AI-assisted explanation.
 
 ## Authentication Scan Demo
 
@@ -65,6 +65,16 @@ python -m sentinellite scan-auth examples/auth_logs/sample_auth.log
 ```
 
 Explain that SentinelLite AI parses authentication activity, normalizes it into security events, applies transparent detection rules, assigns risk scores, and produces structured alerts.
+
+### Deterministic Alert Explanation Demo
+
+The included authentication sample produces scored alerts, so the same command is a stable explanation demonstration:
+
+```bash
+python -m sentinellite scan-auth examples/auth_logs/sample_auth.log
+```
+
+After the existing alert table, review the `Deterministic Alert Explanations` panels. Explain that each panel comes from a local rule template and uses evidence already present in the alert. Explanation panels appear only when scored alerts exist; a no-alert scan does not print an empty explanation section.
 
 ## Process Scan Demo
 
@@ -100,7 +110,23 @@ Then demonstrate observation of multiple selected files:
 python -m sentinellite scan-files README.md pyproject.toml
 ```
 
-The current implementation records metadata and SHA-256 hashes for the supplied paths. It does not repair files or yet compare observations with a persistent baseline.
+The current implementation records metadata and SHA-256 hashes for the supplied paths. It does not repair or modify files. Persistent comparison is available through the separate baseline workflow below.
+
+## Baseline-Backed File Integrity Demo
+
+Create a baseline for explicitly selected files:
+
+```bash
+python -m sentinellite baseline-files README.md pyproject.toml --baseline-path file-integrity-baseline.json
+```
+
+Scan the paths recorded in that baseline:
+
+```bash
+python -m sentinellite scan-files-baseline --baseline-path file-integrity-baseline.json
+```
+
+For a controlled changed-file demonstration, use a temporary test file that you are authorized to modify, create its baseline, change its contents, and scan the baseline again. A changed state can generate `FIM-004 File Changed Compared With Baseline`, followed by a deterministic panel that recommends confirming whether the change was expected and reviewing relevant update, deployment, and user context. The alert is an investigation signal, not an automatic classification of the change.
 
 ## JSON Reports
 
@@ -117,6 +143,8 @@ Each alert contains information suitable for review and later integration, inclu
 
 Open a generated JSON report after a scan to show how terminal summaries connect to structured, reviewable alert data.
 
+Deterministic explanations are displayed only in the terminal for this milestone. The JSON report schema is unchanged and does not export explanation objects yet.
+
 ## Safe Demo Notes
 
 - SentinelLite AI is a defensive-only project.
@@ -125,6 +153,7 @@ Open a generated JSON report after a scan to show how terminal summaries connect
 - It does not send network packets.
 - It does not repair or modify observed files.
 - Alerts are investigation-focused and do not claim malware classification.
+- Deterministic explanations are local rule templates and do not call an AI model, LLM, or API.
 - AI-assisted alert explanation is planned but is not implemented yet.
 
 Only demonstrate the project on systems and data that you are authorized to observe.
@@ -138,13 +167,15 @@ Only demonstrate the project on systems and data that you are authorized to obse
 5. Run the process scan.
 6. Run the network observation scan.
 7. Run the file integrity observation scan.
-8. Open a generated JSON report and explain its alert fields.
-9. Explain the current limitations and next roadmap items.
+8. Create and scan a file integrity baseline.
+9. Review deterministic explanation panels when a scan produces alerts.
+10. Open a generated JSON report and explain that its schema remains unchanged.
+11. Explain the current limitations and next roadmap items.
 
 ## Current Limitations
 
 - There is no persistent monitoring daemon yet.
-- Baseline-backed file change detection is not implemented yet.
+- There is no dashboard yet.
+- JSON explanation export is not included yet.
 - AI-assisted explanation is not implemented yet.
 - The project has a Linux-first design; macOS is supported as a development mode.
-

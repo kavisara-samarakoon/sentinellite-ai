@@ -43,7 +43,9 @@ jobs:
         run: python -m sentinellite
 
       - name: Run authentication scan smoke test
-        run: python -m sentinellite scan-auth examples/auth_logs/sample_auth.log
+        run: |
+          python -m sentinellite scan-auth examples/auth_logs/sample_auth.log | tee /tmp/sentinellite-auth-smoke.txt
+          grep -Fq "Deterministic Alert Explanations" /tmp/sentinellite-auth-smoke.txt
 
       - name: Run process scan smoke test
         run: python -m sentinellite scan-process

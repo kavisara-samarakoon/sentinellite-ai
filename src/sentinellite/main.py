@@ -22,6 +22,7 @@ from sentinellite.pipeline.process_scan import run_process_scan
 from sentinellite.reporting.json_reporter import read_alert_report
 
 console = Console()
+CURRENT_VERSION = "0.3.0-alpha"
 
 app = typer.Typer(
     help="SentinelLite AI - Lightweight Linux endpoint detection and monitoring agent.",
@@ -85,10 +86,9 @@ def _show_alert_explanations(alerts: Iterable[object]) -> None:
 
 def show_banner(config: dict[str, Any]) -> None:
     app_name = config["app"].get("name", "SentinelLite AI")
-    version = config["app"].get("version", "0.1.0")
 
     banner = f"""
-{app_name} v{version}
+{app_name} v{CURRENT_VERSION}
 Linux Endpoint Security Monitoring Agent
 """
     console.print(Panel.fit(banner, title=app_name, border_style="cyan"))

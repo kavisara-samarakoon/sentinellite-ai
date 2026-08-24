@@ -113,6 +113,7 @@ def test_default_status_describes_implemented_and_planned_modules() -> None:
     result = runner.invoke(app)
 
     assert result.exit_code == 0
+    assert "SentinelLite AI v0.3.0-alpha" in result.stdout
     assert "│ Authentication Monitor  │ Enabled │" in result.stdout
     assert "│ Process Monitor         │ Enabled │" in result.stdout
     assert "│ Network Monitor         │ Enabled │" in result.stdout
