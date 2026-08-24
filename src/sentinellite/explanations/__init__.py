@@ -1,3 +1,8 @@
+from sentinellite.explanations.cli import (
+    build_explanation_panel,
+    build_explanation_panels,
+    explanation_has_displayable_evidence,
+)
 from sentinellite.explanations.generator import (
     explanation_to_dict,
     explanations_to_dicts,
@@ -20,7 +25,10 @@ __all__ = [
     "EXPLANATION_TEMPLATES",
     "AlertExplanation",
     "AlertExplanationTemplate",
+    "build_explanation_panel",
+    "build_explanation_panels",
     "build_generic_explanation",
+    "explanation_has_displayable_evidence",
     "explanation_to_dict",
     "explanations_to_dicts",
     "generate_alert_explanation",
