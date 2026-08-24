@@ -1,3 +1,4 @@
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -8,6 +9,8 @@ from rich.table import Table
 
 from sentinellite.collectors.system import SystemInfo, collect_system_info
 from sentinellite.config.loader import ConfigError, load_config
+from sentinellite.explanations.cli import build_explanation_panels
+from sentinellite.explanations.generator import generate_alert_explanation
 from sentinellite.pipeline.auth_scan import run_auth_scan
 from sentinellite.pipeline.file_integrity_baseline_scan import (
     create_file_integrity_baseline,
@@ -24,6 +27,60 @@ app = typer.Typer(
     help="SentinelLite AI - Lightweight Linux endpoint detection and monitoring agent.",
     invoke_without_command=True,
 )
+
+
+def _alert_value(alert: object, field_name: str) -> object | None:
+    if isinstance(alert, Mapping):
+        return alert.get(field_name)
+    return getattr(alert, field_name, None)
+
+
+def _build_alert_evidence_summary(alert: object) -> dict[str, object]:
+    evidence_summary: dict[str, object] = {}
+
+    for output_name, field_name in (
+        ("rule_id", "rule_id"),
+        ("severity", "severity"),
+        ("score", "risk_score"),
+        ("event_type", "event_type"),
+        ("source", "source"),
+        ("message", "message"),
+    ):
+        value = _alert_value(alert, field_name)
+        if value is not None:
+            evidence_summary[output_name] = value
+
+    alert_evidence = _alert_value(alert, "evidence")
+    if isinstance(alert_evidence, Mapping):
+        for field_name in ("path", "status"):
+            value = alert_evidence.get(field_name)
+            if value is not None:
+                evidence_summary[field_name] = value
+
+    return evidence_summary
+
+
+def _show_alert_explanations(alerts: Iterable[object]) -> None:
+    explanations = []
+
+    for alert in alerts:
+        rule_id = _alert_value(alert, "rule_id")
+        if not isinstance(rule_id, str):
+            continue
+        explanations.append(
+            generate_alert_explanation(
+                rule_id,
+                _build_alert_evidence_summary(alert),
+            )
+        )
+
+    if not explanations:
+        return
+
+    console.print()
+    console.print("[bold cyan]Deterministic Alert Explanations[/bold cyan]")
+    for panel in build_explanation_panels(explanations):
+        console.print(panel)
 
 
 def show_banner(config: dict[str, Any]) -> None:
@@ -199,6 +256,7 @@ def scan_auth_command(
             )
 
         console.print(alert_table)
+        _show_alert_explanations(scored_alerts)
     else:
         console.print("[yellow][!] No alerts generated.[/yellow]")
 
@@ -243,6 +301,7 @@ def scan_process_command(
             )
 
         console.print(alert_table)
+        _show_alert_explanations(alerts)
     else:
         console.print("[green][+] No process alerts generated.[/green]")
 
@@ -287,6 +346,7 @@ def scan_network_command(
             )
 
         console.print(alert_table)
+        _show_alert_explanations(alerts)
     else:
         console.print("[green][+] No network alerts generated.[/green]")
 
@@ -341,6 +401,7 @@ def scan_files_command(
             )
 
         console.print(alert_table)
+        _show_alert_explanations(alerts)
     else:
         console.print("[green][+] No file integrity alerts generated.[/green]")
 
@@ -464,6 +525,7 @@ def scan_files_baseline_command(
             )
 
         console.print(alert_table)
+        _show_alert_explanations(alerts)
     else:
         console.print("[green][+] No baseline file integrity alerts generated.[/green]")
 
