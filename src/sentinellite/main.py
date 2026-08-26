@@ -25,7 +25,7 @@ from sentinellite.pipeline.process_scan import run_process_scan
 from sentinellite.reporting.json_reporter import read_alert_report
 
 console = Console()
-CURRENT_VERSION = "0.4.0-alpha"
+CURRENT_VERSION = "0.5.0-alpha"
 
 app = typer.Typer(
     help="SentinelLite AI - Lightweight Linux endpoint detection and monitoring agent.",

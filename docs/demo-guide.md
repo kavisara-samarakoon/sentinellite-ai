@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This guide provides a safe, professional flow for demonstrating the SentinelLite AI `v0.4.0-alpha` in-development milestone. The demonstration focuses on implemented defensive monitoring, transparent detection results, local deterministic alert explanations, optional JSON explanation export, and the project's current limitations.
+This guide provides a safe, professional flow for demonstrating the SentinelLite AI `v0.5.0-alpha` in-development milestone. The demonstration focuses on explicit local TOML configuration, implemented defensive monitoring, transparent detection results, local deterministic alert explanations, optional JSON explanation export, and the project's current limitations.
 
 ## Demo Environment
 
@@ -55,6 +55,59 @@ python -m sentinellite
 ```
 
 Use this output to introduce the current milestone and distinguish implemented deterministic explanation templates from future AI-assisted explanation.
+
+## TOML Configuration Demo
+
+Create the default configuration in the current directory:
+
+```bash
+python -m sentinellite config-init
+```
+
+Inspect `sentinellite.toml` with a local text editor. The file contains reporting settings, module switches, and a list of disabled rule IDs. `config-init` refuses to overwrite an existing file, and SentinelLite AI does not automatically discover this file.
+
+Run the authentication scan with the config explicitly selected:
+
+```bash
+python -m sentinellite --config sentinellite.toml scan-auth examples/auth_logs/sample_auth.log
+```
+
+To demonstrate a config-selected report directory and nested JSON explanations, edit the reporting table:
+
+```toml
+[reporting]
+output_dir = "demo-reports"
+include_explanations = true
+```
+
+Run the same explicit-config command again. The report is written beneath `demo-reports/`, and each generated alert contains a nested deterministic `explanation` object. An explicit `--output-dir`, `--include-explanations`, or `--no-include-explanations` option overrides the corresponding config value.
+
+To demonstrate rule control, disable the failed-login rule:
+
+```toml
+[rules]
+disabled_ids = ["AUTH-001"]
+```
+
+Run the authentication command again. `AUTH-001` alerts and their explanations are absent, while other matching authentication rules remain active. Rule IDs are validated and case-sensitive; invalid IDs cause a clean configuration error before the scan runs.
+
+To demonstrate module gating, disable process monitoring:
+
+```toml
+[modules]
+authentication = true
+process = false
+network = true
+file_integrity = true
+```
+
+Then run:
+
+```bash
+python -m sentinellite --config sentinellite.toml scan-process
+```
+
+The command exits non-zero with `Process monitoring is disabled by configuration.` No process collection or alert report writing occurs. Restore `process = true` before continuing with the process demo.
 
 ## Authentication Scan Demo
 
@@ -122,7 +175,7 @@ print("Default and opt-in JSON reports verified.")
 PY
 ```
 
-Both scans still display terminal explanation panels when scored alerts exist. The flag controls only whether explanation objects are also exported inside the JSON alerts.
+Both scans still display terminal explanation panels when scored alerts exist. The flag controls only whether explanation objects are also exported inside the JSON alerts. A selected config can provide the same setting through `reporting.include_explanations`, while the explicit CLI flag takes precedence.
 
 ## Process Scan Demo
 
@@ -209,19 +262,22 @@ Only demonstrate the project on systems and data that you are authorized to obse
 1. Show the README and introduce the defensive project scope.
 2. Run the Ruff and Pytest quality checks.
 3. Run the main CLI status command.
-4. Run the authentication scan against the included sample log.
-5. Run the process scan.
-6. Run the network observation scan.
-7. Run the file integrity observation scan.
-8. Create and scan a file integrity baseline.
-9. Review deterministic explanation panels when a scan produces alerts.
-10. Compare default and opt-in JSON reports and show the nested per-alert explanation.
-11. Explain the current limitations and next roadmap items.
+4. Create and inspect `sentinellite.toml` with `config-init`.
+5. Run the authentication scan with explicit `--config` selection.
+6. Demonstrate configured reporting, rule disabling, and module gating.
+7. Run the process scan.
+8. Run the network observation scan.
+9. Run the file integrity observation scan.
+10. Create and scan a file integrity baseline.
+11. Review deterministic explanation panels when a scan produces alerts.
+12. Compare default and opt-in JSON reports and show the nested per-alert explanation.
+13. Explain the current limitations and next roadmap items.
 
 ## Current Limitations
 
 - There is no persistent monitoring daemon yet.
 - There is no dashboard yet.
-- JSON explanation export requires the explicit `--include-explanations` option.
+- Config files must be selected explicitly with `--config`; automatic discovery is not implemented.
+- JSON explanation export requires `--include-explanations` or `reporting.include_explanations = true` in an explicitly selected config.
 - AI-assisted explanation is not implemented yet.
 - The project has a Linux-first design; macOS is supported as a development mode.

@@ -6,12 +6,16 @@ The project is a Python CLI tool focused on defensive Linux security monitoring.
 
 ## Current Status
 
-Current milestone: `v0.4.0-alpha` (in development; not released)
+Current milestone: `v0.5.0-alpha` (in development; not released)
 
 Current milestone status:
 
 - CLI startup working
-- Configuration loader working
+- Typed TOML configuration models, loading, and validation implemented
+- `config-init` command implemented with safe overwrite refusal
+- Explicit global `--config` loading implemented without automatic discovery
+- Configurable reporting output and deterministic JSON explanation export implemented
+- Configurable module gating and validated rule disabling implemented
 - System information display working
 - Authentication log collector implemented
 - Normalized security event model implemented
@@ -46,7 +50,7 @@ Current milestone status:
 - Deterministic explanations displayed by scan commands when scored alerts exist
 - Optional deterministic JSON explanation export implemented behind `--include-explanations`
 - Default JSON alert reports retain the existing five-field top-level structure
-- 308 automated tests passing
+- 414 automated tests passing
 
 Baseline-backed file integrity monitoring is implemented and has been validated on Ubuntu ARM64. See the [Linux ARM64 validation notes](docs/linux-validation.md).
 
@@ -58,7 +62,9 @@ See the [v0.2.0-alpha release notes](docs/release-notes-v0.2.0-alpha.md) for the
 
 See the [v0.3.0-alpha release notes](docs/release-notes-v0.3.0-alpha.md) for the deterministic CLI alert explanation milestone.
 
-See the [v0.4.0-alpha release notes](docs/release-notes-v0.4.0-alpha.md) for the current optional JSON explanation export milestone.
+See the [v0.4.0-alpha release notes](docs/release-notes-v0.4.0-alpha.md) for the optional JSON explanation export milestone.
+
+See the [v0.5.0-alpha release notes](docs/release-notes-v0.5.0-alpha.md) for the current explicit TOML configuration milestone.
 
 ## Security Scope
 
@@ -102,7 +108,12 @@ It is not intended for:
 ## Implemented Features
 
 - System information display
-- YAML configuration loading
+- Typed TOML configuration loading and validation
+- Safe default TOML generation through `config-init`
+- Explicit configuration selection through global `--config`
+- Configurable report directories and JSON explanation export
+- Configurable monitoring-module gating
+- Validated detection-rule disabling by rule ID
 - Authentication log parsing
 - Failed SSH login detection
 - Successful SSH login detection
@@ -188,6 +199,61 @@ Show SentinelLite AI status:
 python -m sentinellite
 ```
 
+### TOML Configuration
+
+Create a default local configuration file without overwriting an existing file:
+
+```bash
+python -m sentinellite config-init
+```
+
+Use `--path` to select another location. Parent directories must already exist:
+
+```bash
+python -m sentinellite config-init --path configs/sentinellite.toml
+```
+
+Configuration is loaded only when explicitly selected with the global `--config` option:
+
+```bash
+python -m sentinellite --config sentinellite.toml scan-auth examples/auth_logs/sample_auth.log
+```
+
+SentinelLite AI does not automatically discover `sentinellite.toml` in the current directory. Without `--config`, the built-in defaults preserve the existing behavior: reports go to `reports/`, JSON explanation export is disabled, all monitoring modules are enabled, and all registered rules are active.
+
+The generated file uses this structure:
+
+```toml
+config_version = 1
+
+[reporting]
+output_dir = "reports"
+include_explanations = false
+
+[modules]
+authentication = true
+process = true
+network = true
+file_integrity = true
+
+[rules]
+disabled_ids = []
+```
+
+`reporting.output_dir` selects the JSON alert report directory. A relative directory is resolved from the directory containing the selected config file. `reporting.include_explanations` controls nested deterministic explanation export; it does not change terminal explanation panels.
+
+For reporting options, precedence is:
+
+```text
+explicit CLI option > selected TOML config > built-in default
+```
+
+The scan commands support `--include-explanations` and `--no-include-explanations`, allowing either config value to be explicitly overridden. `--output-dir` similarly overrides `reporting.output_dir`.
+
+The `[modules]` values control their corresponding scan commands. Setting a module to `false` makes its command exit non-zero before collection, report writing, or baseline creation. Authentication controls `scan-auth`; process controls `scan-process`; network controls `scan-network`; and file integrity controls `scan-files`, `baseline-files`, and `scan-files-baseline`.
+
+`rules.disabled_ids` accepts validated, case-sensitive rule IDs such as `AUTH-001` or `FIM-004`. Disabled rules are removed before detection, so their alerts and explanations are not generated. Unknown rule IDs cause configuration loading to fail cleanly.
+
 Scan a sample authentication log file:
 
 ```bash
@@ -202,7 +268,7 @@ Terminal explanation panels continue to appear whenever a scan produces scored a
 python -m sentinellite scan-auth examples/auth_logs/sample_auth.log --include-explanations
 ```
 
-Without the option, JSON reports remain unchanged. With the option, each alert receives its own nested `explanation` object. The report does not add a top-level `explanations` field.
+Without the option or an enabled config setting, JSON reports remain unchanged. With the option, or with `reporting.include_explanations = true`, each alert receives its own nested `explanation` object. Use `--no-include-explanations` to override an enabled config setting. The report does not add a top-level `explanations` field.
 
 Scan the current running process list:
 
@@ -394,11 +460,11 @@ This layer is deterministic and rule-based. It does not call an AI model, LLM, n
 
 ## Reports
 
-SentinelLite AI writes alert reports to the `reports/` directory.
+SentinelLite AI writes alert reports to the `reports/` directory by default. A selected TOML config can set `reporting.output_dir`, and an explicit `--output-dir` option takes precedence over that value.
 
 Reports are generated as JSON files. Local reports are ignored by Git to avoid committing machine-specific scan output.
 
-By default, reports retain the same five top-level fields: `report_id`, `report_type`, `generated_at`, `alert_count`, and `alerts`. Passing `--include-explanations` adds a nested `explanation` object to each alert while leaving that top-level structure unchanged. No top-level `explanations` field is added.
+By default, reports retain the same five top-level fields: `report_id`, `report_type`, `generated_at`, `alert_count`, and `alerts`. Passing `--include-explanations` or enabling `reporting.include_explanations` adds a nested `explanation` object to each alert while leaving that top-level structure unchanged. No top-level `explanations` field is added.
 
 Example report structure:
 
@@ -428,7 +494,7 @@ The nested `explanation` shown above is present only in an opt-in report. Explan
 
 ## Testing
 
-The current test suite contains 308 tests covering collectors, baseline models and persistence, normalization, detection, scoring, reporting, deterministic explanations, pipelines, and CLI behavior.
+The current test suite contains 414 tests covering configuration, collectors, baseline models and persistence, normalization, detection, scoring, reporting, deterministic explanations, pipelines, and CLI behavior.
 
 Run all tests:
 
@@ -448,6 +514,8 @@ Recommended full local check:
 ruff check src tests
 pytest
 python -m sentinellite
+python -m sentinellite config-init --path /tmp/sentinellite-v05.toml
+python -m sentinellite --config /tmp/sentinellite-v05.toml scan-auth examples/auth_logs/sample_auth.log
 python -m sentinellite scan-auth examples/auth_logs/sample_auth.log
 python -m sentinellite scan-auth examples/auth_logs/sample_auth.log --include-explanations
 python -m sentinellite scan-process
@@ -534,6 +602,15 @@ File integrity rules report current observation conditions such as an absent pat
 - Explicit `--include-explanations` support across alert-producing scan commands
 - Backward-compatible default JSON reports
 - CI validation for nested opt-in explanation objects
+
+### Version 0.5
+
+- Typed local `sentinellite.toml` configuration
+- Safe `config-init` command
+- Explicit global `--config` selection without automatic discovery
+- Configurable reporting directory and JSON explanation export
+- Validated rule disabling through `rules.disabled_ids`
+- Monitoring-module gating before collection and report or baseline writing
 
 ### Version 1.0
 
