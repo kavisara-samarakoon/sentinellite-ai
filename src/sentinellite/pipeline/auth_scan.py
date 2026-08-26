@@ -27,6 +27,8 @@ def run_auth_scan(
     log_path: str | Path,
     output_dir: str | Path = "reports",
     report_filename: str | None = None,
+    *,
+    include_explanations: bool = False,
 ) -> tuple[AuthScanSummary, list[ScoredAlert]]:
     auth_events = collect_auth_events_from_file(log_path)
 
@@ -42,6 +44,7 @@ def run_auth_scan(
         scored_alerts,
         output_dir=output_dir,
         filename=report_filename,
+        include_explanations=include_explanations,
     )
 
     summary = AuthScanSummary(

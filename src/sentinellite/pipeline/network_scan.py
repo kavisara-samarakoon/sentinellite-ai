@@ -20,7 +20,11 @@ class NetworkScanSummary:
         return asdict(self)
 
 
-def run_network_scan(output_dir: Path | str = "reports") -> NetworkScanSummary:
+def run_network_scan(
+    output_dir: Path | str = "reports",
+    *,
+    include_explanations: bool = False,
+) -> NetworkScanSummary:
     """Collect network observations and write scored detection alerts to JSON."""
     connections = collect_network_connections()
 
@@ -35,6 +39,7 @@ def run_network_scan(output_dir: Path | str = "reports") -> NetworkScanSummary:
     report_path = write_alert_report(
         scored_alerts,
         output_dir=output_dir,
+        include_explanations=include_explanations,
     )
 
     return NetworkScanSummary(

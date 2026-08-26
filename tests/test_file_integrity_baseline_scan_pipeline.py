@@ -119,6 +119,31 @@ def test_baseline_scan_detects_changed_file_and_writes_report(tmp_path: Path) ->
     assert report["alert_count"] == 1
     assert report["alerts"][0]["rule_id"] == "FIM-004"
     assert report["alerts"][0]["risk_score"] == 70
+    assert "explanation" not in report["alerts"][0]
+    assert "explanations" not in report
+
+
+def test_baseline_changed_file_includes_fim_004_explanation_when_requested(
+    tmp_path: Path,
+) -> None:
+    monitored_path = tmp_path / "monitored.txt"
+    monitored_path.write_text("original", encoding="utf-8")
+    baseline_path = tmp_path / "baseline.json"
+    create_file_integrity_baseline([str(monitored_path)], baseline_path)
+    monitored_path.write_text("updated content", encoding="utf-8")
+
+    summary = run_file_integrity_baseline_scan(
+        baseline_path,
+        output_dir=tmp_path / "reports",
+        include_explanations=True,
+    )
+
+    report = read_alert_report(summary.report_path)
+    alert = report["alerts"][0]
+    assert alert["rule_id"] == "FIM-004"
+    assert alert["explanation"]["rule_id"] == "FIM-004"
+    assert alert["explanation"]["evidence_summary"]["status"] == "changed"
+    assert "explanations" not in report
 
 
 def test_unchanged_file_produces_zero_scored_alerts(tmp_path: Path) -> None:
@@ -130,6 +155,7 @@ def test_unchanged_file_produces_zero_scored_alerts(tmp_path: Path) -> None:
     summary = run_file_integrity_baseline_scan(
         baseline_path,
         output_dir=tmp_path / "reports",
+        include_explanations=True,
     )
 
     assert summary.files_checked_count == 1
@@ -140,6 +166,8 @@ def test_unchanged_file_produces_zero_scored_alerts(tmp_path: Path) -> None:
     report = read_alert_report(summary.report_path)
     assert report["alert_count"] == 0
     assert report["alerts"] == []
+    assert "explanations" not in report
+    assert "explanation" not in report
 
 
 def test_missing_file_compared_with_baseline_produces_alert(tmp_path: Path) -> None:

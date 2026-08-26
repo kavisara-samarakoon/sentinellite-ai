@@ -69,6 +69,8 @@ def test_file_integrity_scan_writes_scored_missing_file_alert(
     missing_file_alert = report_data["alerts"][0]
     assert missing_file_alert["risk_score"] == 60
     assert missing_file_alert["risk_level"] == "medium"
+    assert all("explanation" not in alert for alert in report_data["alerts"])
+    assert "explanations" not in report_data
 
     assert summary.to_dict() == {
         "files_checked_count": 2,
@@ -77,6 +79,45 @@ def test_file_integrity_scan_writes_scored_missing_file_alert(
         "scored_alerts_count": 2,
         "report_path": str(report_path),
     }
+
+
+def test_file_integrity_scan_includes_explanations_when_requested(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monitored_paths = ["/selected/missing.txt"]
+    monkeypatch.setattr(
+        "sentinellite.pipeline.file_integrity_scan.collect_file_integrity",
+        lambda paths: [
+            FileIntegrityRecord(
+                path="/selected/missing.txt",
+                exists=False,
+                is_file=False,
+                size_bytes=None,
+                modified_time_epoch=None,
+                sha256=None,
+                error="Path does not exist: /selected/missing.txt",
+            )
+        ],
+    )
+
+    summary = run_file_integrity_scan(
+        monitored_paths,
+        output_dir=tmp_path,
+        include_explanations=True,
+    )
+    report_data = read_alert_report(summary.report_path)
+
+    assert [alert["rule_id"] for alert in report_data["alerts"]] == [
+        "FIM-001",
+        "FIM-002",
+    ]
+    assert all("explanation" in alert for alert in report_data["alerts"])
+    assert all(
+        alert["explanation"]["rule_id"] == alert["rule_id"]
+        for alert in report_data["alerts"]
+    )
+    assert "explanations" not in report_data
 
 
 def test_file_integrity_scan_writes_empty_report_when_no_rules_match(
@@ -91,7 +132,11 @@ def test_file_integrity_scan_writes_empty_report_when_no_rules_match(
         lambda paths: records,
     )
 
-    summary = run_file_integrity_scan(monitored_paths, output_dir=tmp_path)
+    summary = run_file_integrity_scan(
+        monitored_paths,
+        output_dir=tmp_path,
+        include_explanations=True,
+    )
 
     assert summary.files_checked_count == 1
     assert summary.security_events_count == 1
@@ -104,3 +149,5 @@ def test_file_integrity_scan_writes_empty_report_when_no_rules_match(
     report_data = read_alert_report(report_path)
     assert report_data["alert_count"] == 0
     assert report_data["alerts"] == []
+    assert "explanations" not in report_data
+    assert "explanation" not in report_data

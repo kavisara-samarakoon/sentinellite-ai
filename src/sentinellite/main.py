@@ -192,12 +192,18 @@ def main(ctx: typer.Context) -> None:
 def scan_auth_command(
     log_path: Path,
     output_dir: Path = Path("reports"),
+    include_explanations: bool = typer.Option(
+        False,
+        "--include-explanations",
+        help="Include deterministic alert explanations in the JSON report.",
+    ),
 ) -> None:
     """Scan an authentication log file and generate a JSON alert report."""
     try:
         summary, scored_alerts = run_auth_scan(
             log_path=log_path,
             output_dir=output_dir,
+            include_explanations=include_explanations,
         )
     except FileNotFoundError as error:
         console.print(f"[red][!] {error}[/red]")
@@ -240,9 +246,17 @@ def scan_auth_command(
 @app.command("scan-process")
 def scan_process_command(
     output_dir: Path = Path("reports"),
+    include_explanations: bool = typer.Option(
+        False,
+        "--include-explanations",
+        help="Include deterministic alert explanations in the JSON report.",
+    ),
 ) -> None:
     """Scan running processes and generate a JSON alert report."""
-    summary = run_process_scan(output_dir=output_dir)
+    summary = run_process_scan(
+        output_dir=output_dir,
+        include_explanations=include_explanations,
+    )
 
     console.print(Panel.fit("Process Scan Complete", title="SentinelLite AI", border_style="green"))
 
@@ -285,9 +299,17 @@ def scan_process_command(
 @app.command("scan-network")
 def scan_network_command(
     output_dir: Path = Path("reports"),
+    include_explanations: bool = typer.Option(
+        False,
+        "--include-explanations",
+        help="Include deterministic alert explanations in the JSON report.",
+    ),
 ) -> None:
     """Collect network connection observations and generate a JSON alert report."""
-    summary = run_network_scan(output_dir=output_dir)
+    summary = run_network_scan(
+        output_dir=output_dir,
+        include_explanations=include_explanations,
+    )
 
     console.print(Panel.fit("Network Scan Complete", title="SentinelLite AI", border_style="green"))
 
@@ -334,9 +356,18 @@ def scan_files_command(
         typer.Argument(help="One or more explicit file paths to observe without modification."),
     ],
     output_dir: Path = Path("reports"),
+    include_explanations: bool = typer.Option(
+        False,
+        "--include-explanations",
+        help="Include deterministic alert explanations in the JSON report.",
+    ),
 ) -> None:
     """Observe selected file paths and generate a JSON alert report."""
-    summary = run_file_integrity_scan(paths=paths, output_dir=output_dir)
+    summary = run_file_integrity_scan(
+        paths=paths,
+        output_dir=output_dir,
+        include_explanations=include_explanations,
+    )
 
     console.print(
         Panel.fit(
@@ -445,12 +476,18 @@ def scan_files_baseline_command(
             help="Directory for the generated JSON alert report.",
         ),
     ] = Path("reports"),
+    include_explanations: bool = typer.Option(
+        False,
+        "--include-explanations",
+        help="Include deterministic alert explanations in the JSON report.",
+    ),
 ) -> None:
     """Scan the exact paths stored in a file integrity baseline."""
     try:
         summary = run_file_integrity_baseline_scan(
             baseline_path=baseline_path,
             output_dir=output_dir,
+            include_explanations=include_explanations,
         )
     except FileNotFoundError as error:
         console.print(f"[red][!] {error}[/red]")

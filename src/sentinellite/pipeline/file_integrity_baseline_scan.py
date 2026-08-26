@@ -54,6 +54,8 @@ class FileIntegrityBaselineScanSummary:
 def run_file_integrity_baseline_scan(
     baseline_path: Path | str,
     output_dir: Path | str = "reports",
+    *,
+    include_explanations: bool = False,
 ) -> FileIntegrityBaselineScanSummary:
     """Compare current observations with a saved baseline and report scored alerts."""
     loaded_baseline_path = Path(baseline_path)
@@ -68,7 +70,11 @@ def run_file_integrity_baseline_scan(
     ]
     detection_matches = detect_events(security_events)
     scored_alerts = score_rule_matches(detection_matches)
-    report_path = write_alert_report(scored_alerts, output_dir=output_dir)
+    report_path = write_alert_report(
+        scored_alerts,
+        output_dir=output_dir,
+        include_explanations=include_explanations,
+    )
 
     return FileIntegrityBaselineScanSummary(
         baseline_path=loaded_baseline_path,

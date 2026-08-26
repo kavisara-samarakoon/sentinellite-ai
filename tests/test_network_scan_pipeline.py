@@ -70,6 +70,8 @@ def test_network_scan_writes_scored_network_alert(
     assert report_data["alerts"][0]["rule_id"] == "NET-001"
     assert report_data["alerts"][0]["risk_score"] == 55
     assert report_data["alerts"][0]["risk_level"] == "medium"
+    assert "explanation" not in report_data["alerts"][0]
+    assert "explanations" not in report_data
 
     assert summary.to_dict() == {
         "connections_count": 2,
@@ -78,6 +80,32 @@ def test_network_scan_writes_scored_network_alert(
         "scored_alerts_count": 1,
         "report_path": str(report_path),
     }
+
+
+def test_network_scan_includes_explanation_when_requested(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        "sentinellite.pipeline.network_scan.collect_network_connections",
+        lambda: [
+            create_connection(
+                fd=8,
+                local_port=8080,
+                remote_address=None,
+                remote_port=None,
+                status="LISTEN",
+            )
+        ],
+    )
+
+    summary = run_network_scan(output_dir=tmp_path, include_explanations=True)
+    report_data = read_alert_report(summary.report_path)
+
+    alert = report_data["alerts"][0]
+    assert alert["rule_id"] == "NET-001"
+    assert alert["explanation"]["rule_id"] == "NET-001"
+    assert "explanations" not in report_data
 
 
 def test_network_scan_writes_empty_report_when_no_rules_match(
@@ -98,7 +126,7 @@ def test_network_scan_writes_empty_report_when_no_rules_match(
         lambda: connections,
     )
 
-    summary = run_network_scan(output_dir=tmp_path)
+    summary = run_network_scan(output_dir=tmp_path, include_explanations=True)
 
     assert summary.connections_count == 1
     assert summary.security_events_count == 1
@@ -111,3 +139,5 @@ def test_network_scan_writes_empty_report_when_no_rules_match(
     report_data = read_alert_report(report_path)
     assert report_data["alert_count"] == 0
     assert report_data["alerts"] == []
+    assert "explanations" not in report_data
+    assert "explanation" not in report_data
