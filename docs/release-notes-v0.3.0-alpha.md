@@ -2,7 +2,7 @@
 
 ## Release Status
 
-In-development alpha milestone for controlled demonstration, authorized defensive security learning, and portfolio review. `v0.3.0-alpha` has not been released yet.
+Alpha pre-release milestone for controlled demonstration, authorized defensive security learning, and portfolio review.
 
 ## Release Focus
 
