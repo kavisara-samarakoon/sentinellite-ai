@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from sentinellite.collectors.process import ProcessInfo
+from sentinellite.detection.rules import active_rules_from_disabled_ids
 from sentinellite.pipeline.process_scan import ProcessScanSummary, run_process_scan
 from sentinellite.reporting.json_reporter import read_alert_report
 
@@ -93,6 +94,32 @@ def test_process_scan_includes_explanation_when_requested(
     alert = report_data["alerts"][0]
     assert alert["rule_id"] == "PROC-001"
     assert alert["explanation"]["rule_id"] == "PROC-001"
+    assert "explanations" not in report_data
+
+
+def test_process_scan_can_disable_temporary_path_rule(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        "sentinellite.pipeline.process_scan.collect_processes",
+        lambda: [
+            create_process(
+                pid=200,
+                name="worker",
+                exe="/tmp/worker",
+                cmdline=["/tmp/worker"],
+            )
+        ],
+    )
+    rules = active_rules_from_disabled_ids(["PROC-001"])
+
+    summary = run_process_scan(output_dir=tmp_path, rules=rules)
+
+    assert summary.detection_matches_count == 0
+    assert summary.scored_alerts_count == 0
+    report_data = read_alert_report(summary.report_path)
+    assert report_data["alerts"] == []
     assert "explanations" not in report_data
 
 

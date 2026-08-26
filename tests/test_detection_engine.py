@@ -1,6 +1,8 @@
+import pytest
+
 from sentinellite.collectors.auth import auth_event_to_security_event, parse_auth_line
 from sentinellite.detection.engine import RuleMatch, detect_event, detect_events
-from sentinellite.detection.rules import DEFAULT_RULES
+from sentinellite.detection.rules import DEFAULT_RULES, active_rules_from_disabled_ids
 from sentinellite.models.security_event import create_security_event
 
 
@@ -13,6 +15,57 @@ def test_default_rules_are_available() -> None:
     assert "PROC-001" in rule_ids
     assert "PROC-002" in rule_ids
     assert "PROC-003" in rule_ids
+
+
+def test_empty_disabled_ids_preserve_all_default_rules_and_order() -> None:
+    active_rules = active_rules_from_disabled_ids([])
+
+    assert [rule.rule_id for rule in active_rules] == [
+        rule.rule_id for rule in DEFAULT_RULES
+    ]
+
+
+def test_disabling_one_rule_removes_only_that_rule() -> None:
+    active_rules = active_rules_from_disabled_ids(["AUTH-001"])
+
+    assert "AUTH-001" not in [rule.rule_id for rule in active_rules]
+    assert [rule.rule_id for rule in active_rules] == [
+        rule.rule_id for rule in DEFAULT_RULES if rule.rule_id != "AUTH-001"
+    ]
+
+
+def test_disabling_multiple_rule_families_preserves_remaining_order() -> None:
+    disabled_ids = ["AUTH-002", "PROC-003", "NET-001", "FIM-004"]
+
+    active_rules = active_rules_from_disabled_ids(disabled_ids)
+
+    assert [rule.rule_id for rule in active_rules] == [
+        rule.rule_id for rule in DEFAULT_RULES if rule.rule_id not in disabled_ids
+    ]
+
+
+def test_rule_selection_does_not_mutate_default_rules() -> None:
+    original_rules = list(DEFAULT_RULES)
+
+    active_rules_from_disabled_ids(["AUTH-001", "AUTH-001"])
+
+    assert DEFAULT_RULES == original_rules
+
+
+def test_rule_selection_returns_a_new_list() -> None:
+    active_rules = active_rules_from_disabled_ids(())
+
+    assert active_rules is not DEFAULT_RULES
+
+
+def test_unknown_disabled_rule_id_raises_value_error() -> None:
+    with pytest.raises(ValueError, match="Unknown disabled rule ID.*AUTH-999"):
+        active_rules_from_disabled_ids(["AUTH-999"])
+
+
+def test_case_mismatched_disabled_rule_id_raises_value_error() -> None:
+    with pytest.raises(ValueError, match="Unknown disabled rule ID.*auth-001"):
+        active_rules_from_disabled_ids(["auth-001"])
 
 
 def test_detect_failed_ssh_login_event() -> None:

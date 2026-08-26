@@ -1,8 +1,10 @@
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from sentinellite.collectors.network import collect_network_connections
 from sentinellite.detection.engine import detect_events
+from sentinellite.detection.rules import DetectionRule
 from sentinellite.normalization.network import network_connection_to_security_event
 from sentinellite.reporting.json_reporter import write_alert_report
 from sentinellite.scoring.risk import score_rule_matches
@@ -24,6 +26,7 @@ def run_network_scan(
     output_dir: Path | str = "reports",
     *,
     include_explanations: bool = False,
+    rules: Sequence[DetectionRule] | None = None,
 ) -> NetworkScanSummary:
     """Collect network observations and write scored detection alerts to JSON."""
     connections = collect_network_connections()
@@ -33,7 +36,7 @@ def run_network_scan(
         for connection in connections
     ]
 
-    detection_matches = detect_events(security_events)
+    detection_matches = detect_events(security_events, rules=rules)
     scored_alerts = score_rule_matches(detection_matches)
 
     report_path = write_alert_report(

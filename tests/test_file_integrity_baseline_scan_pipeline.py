@@ -10,6 +10,7 @@ from sentinellite.baseline.file_integrity import (
     save_baseline,
 )
 from sentinellite.collectors.file_integrity import FileIntegrityRecord
+from sentinellite.detection.rules import active_rules_from_disabled_ids
 from sentinellite.pipeline.file_integrity_baseline_scan import (
     FileIntegrityBaselineCreateSummary,
     FileIntegrityBaselineScanSummary,
@@ -143,6 +144,28 @@ def test_baseline_changed_file_includes_fim_004_explanation_when_requested(
     assert alert["rule_id"] == "FIM-004"
     assert alert["explanation"]["rule_id"] == "FIM-004"
     assert alert["explanation"]["evidence_summary"]["status"] == "changed"
+    assert "explanations" not in report
+
+
+def test_baseline_scan_can_disable_changed_file_rule(tmp_path: Path) -> None:
+    monitored_path = tmp_path / "monitored.txt"
+    monitored_path.write_text("original", encoding="utf-8")
+    baseline_path = tmp_path / "baseline.json"
+    create_file_integrity_baseline([str(monitored_path)], baseline_path)
+    monitored_path.write_text("updated content", encoding="utf-8")
+    rules = active_rules_from_disabled_ids(["FIM-004"])
+
+    summary = run_file_integrity_baseline_scan(
+        baseline_path,
+        output_dir=tmp_path / "reports",
+        rules=rules,
+    )
+
+    assert summary.comparisons_count == 1
+    assert summary.detection_matches_count == 0
+    assert summary.scored_alerts_count == 0
+    report = read_alert_report(summary.report_path)
+    assert report["alerts"] == []
     assert "explanations" not in report
 
 
