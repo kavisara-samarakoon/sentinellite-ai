@@ -2,7 +2,7 @@
 
 ## Release Status
 
-`v0.5.0-alpha` is an in-development alpha milestone until it is formally released. It is intended for controlled demonstration, authorized defensive security learning, and portfolio review. It is not presented as a production EDR release.
+`v0.5.0-alpha` is a published GitHub pre-release alpha milestone. It is intended for controlled demonstration, authorized defensive security learning, and portfolio review. It is not presented as a production EDR release.
 
 ## Release Focus
 
