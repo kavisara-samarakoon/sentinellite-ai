@@ -43,7 +43,7 @@ macOS development validation passed on the Darwin development environment. Ruff 
 
 Ubuntu ARM64 validation passed on an Ubuntu ARM64 VM using Python 3.14.4. Ruff passed, Pytest passed with 414 tests, the CLI displayed `SentinelLite AI v0.5.0-alpha`, `config-init` created a default TOML config, default config authentication scan preserved the legacy JSON top-level fields, config-driven explanations plus `AUTH-001` rule disabling worked, and disabled process monitoring exited non-zero before collection.
 
-Validation status has been updated after macOS development and Ubuntu ARM64 validation. These release notes do not indicate that a GitHub release has been published.
+Validation status was updated after macOS development and Ubuntu ARM64 validation. A GitHub pre-release has now been published for tag `v0.5.0-alpha`.
 
 ## Safety Scope
 
