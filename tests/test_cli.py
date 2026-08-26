@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 import pytest
+from typer.main import get_command
 from typer.testing import CliRunner
 
 from sentinellite.main import app
@@ -129,16 +130,27 @@ def test_scan_auth_command_keeps_no_alert_output_without_explanations(
         "scan-files-baseline",
     ],
 )
-def test_scan_command_help_describes_json_explanation_flag(command_name: str) -> None:
-    result = runner.invoke(app, [command_name, "--help"])
+def test_scan_command_registers_json_explanation_flag(command_name: str) -> None:
+    root_command = get_command(app)
+    scan_command = root_command.commands[command_name]
+    registered_options = {
+        option
+        for parameter in scan_command.params
+        for option in getattr(parameter, "opts", ())
+    }
+    assert "--include-explanations" in registered_options
 
-    assert result.exit_code == 0
-    normalized_output = " ".join(result.stdout.split())
-    assert "--include-explanations" in normalized_output
-    assert "Include deterministic alert" in normalized_output
-    assert "explanations in the JSON report." in normalized_output
-    assert "--ai" not in normalized_output
-    assert "--llm" not in normalized_output
+    explanation_option = next(
+        parameter
+        for parameter in scan_command.params
+        if "--include-explanations" in getattr(parameter, "opts", ())
+    )
+
+    assert explanation_option.help == (
+        "Include deterministic alert explanations in the JSON report."
+    )
+    assert "--ai" not in registered_options
+    assert "--llm" not in registered_options
 
 
 def test_scan_auth_command_without_flag_writes_legacy_json(tmp_path: Path) -> None:
