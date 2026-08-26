@@ -2,7 +2,7 @@
 
 ## Release Status
 
-`v0.4.0-alpha` is an in-development alpha milestone until it is formally released. It is intended for controlled demonstration, authorized defensive security learning, and portfolio review rather than production deployment.
+`v0.4.0-alpha` is an alpha pre-release milestone. It is intended for controlled demonstration, authorized defensive security learning, and portfolio review rather than production deployment.
 
 ## Release Focus
 
