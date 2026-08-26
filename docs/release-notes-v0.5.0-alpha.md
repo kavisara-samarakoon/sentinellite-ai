@@ -36,8 +36,12 @@ This milestone adds explicit local TOML configuration, safe default-config creat
 ## Validation
 
 - Automated Ruff, Pytest, CLI, and CI smoke validation is defined for this milestone.
-- macOS development validation: pending
-- Ubuntu ARM64 validation: pending
+- macOS development validation: passed
+
+macOS development validation passed on the Darwin development environment. Ruff passed, Pytest passed with 414 tests, the CLI displayed `SentinelLite AI v0.5.0-alpha`, and the v0.5 config smoke test passed.
+- Ubuntu ARM64 validation: passed
+
+Ubuntu ARM64 validation passed on an Ubuntu ARM64 VM using Python 3.14.4. Ruff passed, Pytest passed with 414 tests, the CLI displayed `SentinelLite AI v0.5.0-alpha`, `config-init` created a default TOML config, default config authentication scan preserved the legacy JSON top-level fields, config-driven explanations plus `AUTH-001` rule disabling worked, and disabled process monitoring exited non-zero before collection.
 
 Validation status will be updated only after the corresponding checks are completed. These release notes do not indicate that a GitHub release has been published.
 
