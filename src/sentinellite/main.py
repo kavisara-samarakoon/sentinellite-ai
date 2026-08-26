@@ -8,7 +8,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from sentinellite.collectors.system import SystemInfo, collect_system_info
-from sentinellite.config import write_default_config
+from sentinellite.config import SentinelLiteConfig, default_config, write_default_config
 from sentinellite.config.loader import ConfigError, load_config
 from sentinellite.explanations.cli import build_explanation_panels
 from sentinellite.explanations.evidence import build_alert_evidence_summary
@@ -59,6 +59,26 @@ def _show_alert_explanations(alerts: Iterable[object]) -> None:
     console.print("[bold cyan]Deterministic Alert Explanations[/bold cyan]")
     for panel in build_explanation_panels(explanations):
         console.print(panel)
+
+
+def _reporting_options(
+    ctx: typer.Context,
+    output_dir: Path | None,
+    include_explanations: bool | None,
+) -> tuple[Path, bool]:
+    config = ctx.obj
+    if not isinstance(config, SentinelLiteConfig):
+        config = default_config()
+
+    effective_output_dir = (
+        output_dir if output_dir is not None else config.reporting.output_dir
+    )
+    effective_include_explanations = (
+        include_explanations
+        if include_explanations is not None
+        else config.reporting.include_explanations
+    )
+    return effective_output_dir, effective_include_explanations
 
 
 def show_banner(config: dict[str, Any]) -> None:
@@ -184,7 +204,22 @@ def show_status() -> None:
 
 
 @app.callback()
-def main(ctx: typer.Context) -> None:
+def main(
+    ctx: typer.Context,
+    config_path: Annotated[
+        Path | None,
+        typer.Option(
+            "--config",
+            help="Load settings from this SentinelLite TOML configuration file.",
+        ),
+    ] = None,
+) -> None:
+    try:
+        ctx.obj = default_config() if config_path is None else load_config(config_path)
+    except ConfigError as error:
+        console.print(f"[red][!] Failed to load configuration: {error}[/red]")
+        raise typer.Exit(code=1) from error
+
     if ctx.invoked_subcommand is None:
         show_status()
 
@@ -215,20 +250,31 @@ def config_init_command(
 
 @app.command("scan-auth")
 def scan_auth_command(
+    ctx: typer.Context,
     log_path: Path,
-    output_dir: Path = Path("reports"),
-    include_explanations: bool = typer.Option(
-        False,
-        "--include-explanations",
-        help="Include deterministic alert explanations in the JSON report.",
-    ),
+    output_dir: Annotated[
+        Path | None,
+        typer.Option("--output-dir", help="Directory for the JSON alert report."),
+    ] = None,
+    include_explanations: Annotated[
+        bool | None,
+        typer.Option(
+            "--include-explanations/--no-include-explanations",
+            help="Include deterministic alert explanations in the JSON report.",
+        ),
+    ] = None,
 ) -> None:
     """Scan an authentication log file and generate a JSON alert report."""
+    effective_output_dir, effective_include_explanations = _reporting_options(
+        ctx,
+        output_dir,
+        include_explanations,
+    )
     try:
         summary, scored_alerts = run_auth_scan(
             log_path=log_path,
-            output_dir=output_dir,
-            include_explanations=include_explanations,
+            output_dir=effective_output_dir,
+            include_explanations=effective_include_explanations,
         )
     except FileNotFoundError as error:
         console.print(f"[red][!] {error}[/red]")
@@ -270,17 +316,28 @@ def scan_auth_command(
 
 @app.command("scan-process")
 def scan_process_command(
-    output_dir: Path = Path("reports"),
-    include_explanations: bool = typer.Option(
-        False,
-        "--include-explanations",
-        help="Include deterministic alert explanations in the JSON report.",
-    ),
+    ctx: typer.Context,
+    output_dir: Annotated[
+        Path | None,
+        typer.Option("--output-dir", help="Directory for the JSON alert report."),
+    ] = None,
+    include_explanations: Annotated[
+        bool | None,
+        typer.Option(
+            "--include-explanations/--no-include-explanations",
+            help="Include deterministic alert explanations in the JSON report.",
+        ),
+    ] = None,
 ) -> None:
     """Scan running processes and generate a JSON alert report."""
+    effective_output_dir, effective_include_explanations = _reporting_options(
+        ctx,
+        output_dir,
+        include_explanations,
+    )
     summary = run_process_scan(
-        output_dir=output_dir,
-        include_explanations=include_explanations,
+        output_dir=effective_output_dir,
+        include_explanations=effective_include_explanations,
     )
 
     console.print(Panel.fit("Process Scan Complete", title="SentinelLite AI", border_style="green"))
@@ -323,17 +380,28 @@ def scan_process_command(
 
 @app.command("scan-network")
 def scan_network_command(
-    output_dir: Path = Path("reports"),
-    include_explanations: bool = typer.Option(
-        False,
-        "--include-explanations",
-        help="Include deterministic alert explanations in the JSON report.",
-    ),
+    ctx: typer.Context,
+    output_dir: Annotated[
+        Path | None,
+        typer.Option("--output-dir", help="Directory for the JSON alert report."),
+    ] = None,
+    include_explanations: Annotated[
+        bool | None,
+        typer.Option(
+            "--include-explanations/--no-include-explanations",
+            help="Include deterministic alert explanations in the JSON report.",
+        ),
+    ] = None,
 ) -> None:
     """Collect network connection observations and generate a JSON alert report."""
+    effective_output_dir, effective_include_explanations = _reporting_options(
+        ctx,
+        output_dir,
+        include_explanations,
+    )
     summary = run_network_scan(
-        output_dir=output_dir,
-        include_explanations=include_explanations,
+        output_dir=effective_output_dir,
+        include_explanations=effective_include_explanations,
     )
 
     console.print(Panel.fit("Network Scan Complete", title="SentinelLite AI", border_style="green"))
@@ -376,22 +444,33 @@ def scan_network_command(
 
 @app.command("scan-files")
 def scan_files_command(
+    ctx: typer.Context,
     paths: Annotated[
         list[Path],
         typer.Argument(help="One or more explicit file paths to observe without modification."),
     ],
-    output_dir: Path = Path("reports"),
-    include_explanations: bool = typer.Option(
-        False,
-        "--include-explanations",
-        help="Include deterministic alert explanations in the JSON report.",
-    ),
+    output_dir: Annotated[
+        Path | None,
+        typer.Option("--output-dir", help="Directory for the JSON alert report."),
+    ] = None,
+    include_explanations: Annotated[
+        bool | None,
+        typer.Option(
+            "--include-explanations/--no-include-explanations",
+            help="Include deterministic alert explanations in the JSON report.",
+        ),
+    ] = None,
 ) -> None:
     """Observe selected file paths and generate a JSON alert report."""
+    effective_output_dir, effective_include_explanations = _reporting_options(
+        ctx,
+        output_dir,
+        include_explanations,
+    )
     summary = run_file_integrity_scan(
         paths=paths,
-        output_dir=output_dir,
-        include_explanations=include_explanations,
+        output_dir=effective_output_dir,
+        include_explanations=effective_include_explanations,
     )
 
     console.print(
@@ -487,6 +566,7 @@ def baseline_files_command(
 
 @app.command("scan-files-baseline")
 def scan_files_baseline_command(
+    ctx: typer.Context,
     baseline_path: Annotated[
         Path,
         typer.Option(
@@ -495,24 +575,31 @@ def scan_files_baseline_command(
         ),
     ],
     output_dir: Annotated[
-        Path,
+        Path | None,
         typer.Option(
             "--output-dir",
             help="Directory for the generated JSON alert report.",
         ),
-    ] = Path("reports"),
-    include_explanations: bool = typer.Option(
-        False,
-        "--include-explanations",
-        help="Include deterministic alert explanations in the JSON report.",
-    ),
+    ] = None,
+    include_explanations: Annotated[
+        bool | None,
+        typer.Option(
+            "--include-explanations/--no-include-explanations",
+            help="Include deterministic alert explanations in the JSON report.",
+        ),
+    ] = None,
 ) -> None:
     """Scan the exact paths stored in a file integrity baseline."""
+    effective_output_dir, effective_include_explanations = _reporting_options(
+        ctx,
+        output_dir,
+        include_explanations,
+    )
     try:
         summary = run_file_integrity_baseline_scan(
             baseline_path=baseline_path,
-            output_dir=output_dir,
-            include_explanations=include_explanations,
+            output_dir=effective_output_dir,
+            include_explanations=effective_include_explanations,
         )
     except FileNotFoundError as error:
         console.print(f"[red][!] {error}[/red]")

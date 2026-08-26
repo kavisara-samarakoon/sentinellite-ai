@@ -9,6 +9,9 @@ from typer.testing import CliRunner
 from sentinellite.config import default_config, load_config
 from sentinellite.main import app
 from sentinellite.pipeline.auth_scan import AuthScanSummary
+from sentinellite.pipeline.file_integrity_baseline_scan import (
+    FileIntegrityBaselineScanSummary,
+)
 from sentinellite.pipeline.file_integrity_scan import FileIntegrityScanSummary
 from sentinellite.pipeline.network_scan import NetworkScanSummary
 from sentinellite.pipeline.process_scan import ProcessScanSummary
@@ -22,6 +25,29 @@ REPORT_KEYS = {
     "alert_count",
     "alerts",
 }
+
+
+def write_reporting_config(
+    tmp_path: Path,
+    *,
+    output_dir: str = "configured-reports",
+    include_explanations: bool = False,
+) -> Path:
+    config_path = tmp_path / "sentinellite.toml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "config_version = 1",
+                "",
+                "[reporting]",
+                f'output_dir = "{output_dir}"',
+                f"include_explanations = {str(include_explanations).lower()}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return config_path
 
 
 def test_config_init_creates_valid_default_toml(
@@ -233,9 +259,13 @@ def test_scan_command_registers_json_explanation_flag(command_name: str) -> None
     registered_options = {
         option
         for parameter in scan_command.params
-        for option in getattr(parameter, "opts", ())
+        for option in (
+            *getattr(parameter, "opts", ()),
+            *getattr(parameter, "secondary_opts", ()),
+        )
     }
     assert "--include-explanations" in registered_options
+    assert "--no-include-explanations" in registered_options
 
     explanation_option = next(
         parameter
@@ -248,6 +278,346 @@ def test_scan_command_registers_json_explanation_flag(command_name: str) -> None
     )
     assert "--ai" not in registered_options
     assert "--llm" not in registered_options
+
+
+def test_root_command_registers_config_without_ai_or_llm_options() -> None:
+    root_command = get_command(app)
+    registered_options = {
+        option
+        for parameter in root_command.params
+        for option in (
+            *getattr(parameter, "opts", ()),
+            *getattr(parameter, "secondary_opts", ()),
+        )
+    }
+
+    assert "--config" in registered_options
+    assert "--ai" not in registered_options
+    assert "--llm" not in registered_options
+
+
+def test_scan_auth_without_config_uses_builtin_reporting_defaults(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_run_auth_scan(
+        log_path: Path,
+        output_dir: Path,
+        *,
+        include_explanations: bool,
+    ) -> tuple[AuthScanSummary, list[ScoredAlert]]:
+        captured.update(
+            output_dir=output_dir,
+            include_explanations=include_explanations,
+        )
+        return (
+            AuthScanSummary(
+                log_path=str(log_path),
+                auth_events_count=0,
+                security_events_count=0,
+                detection_matches_count=0,
+                scored_alerts_count=0,
+                report_path="reports/auth-alerts.json",
+            ),
+            [],
+        )
+
+    monkeypatch.setattr("sentinellite.main.run_auth_scan", fake_run_auth_scan)
+
+    result = runner.invoke(app, ["scan-auth", "auth.log"])
+
+    assert result.exit_code == 0
+    assert captured == {
+        "output_dir": Path("reports"),
+        "include_explanations": False,
+    }
+
+
+@pytest.mark.parametrize(
+    ("command_args", "pipeline_name"),
+    [
+        (["scan-auth", "auth.log"], "run_auth_scan"),
+        (["scan-process"], "run_process_scan"),
+        (["scan-network"], "run_network_scan"),
+        (["scan-files", "selected.txt"], "run_file_integrity_scan"),
+        (
+            ["scan-files-baseline", "--baseline-path", "baseline.json"],
+            "run_file_integrity_baseline_scan",
+        ),
+    ],
+)
+def test_json_scan_commands_apply_only_configured_reporting_settings(
+    command_args: list[str],
+    pipeline_name: str,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    config_path = tmp_path / "sentinellite.toml"
+    config_path.write_text(
+        """config_version = 1
+
+[reporting]
+output_dir = "configured-reports"
+include_explanations = true
+
+[modules]
+authentication = false
+process = false
+network = false
+file_integrity = false
+
+[rules]
+disabled_ids = ["AUTH-001"]
+""",
+        encoding="utf-8",
+    )
+    captured: dict[str, object] = {}
+
+    def fake_pipeline(*_args: object, **kwargs: object) -> object:
+        captured.update(kwargs)
+        report_path = tmp_path / "configured-reports" / "alerts.json"
+        if pipeline_name == "run_auth_scan":
+            return (
+                AuthScanSummary(
+                    log_path=str(kwargs["log_path"]),
+                    auth_events_count=0,
+                    security_events_count=0,
+                    detection_matches_count=0,
+                    scored_alerts_count=0,
+                    report_path=str(report_path),
+                ),
+                [],
+            )
+        if pipeline_name == "run_process_scan":
+            return ProcessScanSummary(0, 0, 0, 0, str(report_path))
+        if pipeline_name == "run_network_scan":
+            return NetworkScanSummary(0, 0, 0, 0, str(report_path))
+        if pipeline_name == "run_file_integrity_scan":
+            return FileIntegrityScanSummary(0, 0, 0, 0, str(report_path))
+        return FileIntegrityBaselineScanSummary(
+            baseline_path=Path("baseline.json"),
+            files_checked_count=0,
+            comparisons_count=0,
+            security_events_count=0,
+            detection_matches_count=0,
+            scored_alerts_count=0,
+            report_path=report_path,
+        )
+
+    monkeypatch.setattr(f"sentinellite.main.{pipeline_name}", fake_pipeline)
+
+    result = runner.invoke(
+        app,
+        ["--config", str(config_path), *command_args],
+    )
+
+    assert result.exit_code == 0
+    assert captured["output_dir"] == tmp_path / "configured-reports"
+    assert captured["include_explanations"] is True
+    assert "rules" not in captured
+
+
+def test_config_output_dir_and_false_explanations_write_legacy_json(
+    tmp_path: Path,
+) -> None:
+    config_path = write_reporting_config(tmp_path, include_explanations=False)
+    configured_output_dir = tmp_path / "configured-reports"
+
+    result = runner.invoke(
+        app,
+        [
+            "--config",
+            str(config_path),
+            "scan-auth",
+            "examples/auth_logs/sample_auth.log",
+        ],
+    )
+
+    assert result.exit_code == 0
+    report_paths = list(configured_output_dir.glob("*.json"))
+    assert len(report_paths) == 1
+    report = json.loads(report_paths[0].read_text(encoding="utf-8"))
+    assert set(report) == REPORT_KEYS
+    assert report["alerts"]
+    assert all("explanation" not in alert for alert in report["alerts"])
+    assert "Deterministic Alert Explanations" in result.stdout
+
+
+def test_cli_output_dir_overrides_config_output_dir(tmp_path: Path) -> None:
+    config_path = write_reporting_config(tmp_path)
+    cli_output_dir = tmp_path / "cli-reports"
+
+    result = runner.invoke(
+        app,
+        [
+            "--config",
+            str(config_path),
+            "scan-auth",
+            "examples/auth_logs/sample_auth.log",
+            "--output-dir",
+            str(cli_output_dir),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert len(list(cli_output_dir.glob("*.json"))) == 1
+    assert not (tmp_path / "configured-reports").exists()
+
+
+def test_config_true_writes_nested_json_explanations(tmp_path: Path) -> None:
+    config_path = write_reporting_config(tmp_path, include_explanations=True)
+
+    result = runner.invoke(
+        app,
+        [
+            "--config",
+            str(config_path),
+            "scan-auth",
+            "examples/auth_logs/sample_auth.log",
+        ],
+    )
+
+    assert result.exit_code == 0
+    report_path = next((tmp_path / "configured-reports").glob("*.json"))
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert set(report) == REPORT_KEYS
+    assert report["alerts"]
+    assert all("explanation" in alert for alert in report["alerts"])
+    assert "explanations" not in report
+
+
+def test_cli_include_explanations_overrides_config_false(tmp_path: Path) -> None:
+    config_path = write_reporting_config(tmp_path, include_explanations=False)
+
+    result = runner.invoke(
+        app,
+        [
+            "--config",
+            str(config_path),
+            "scan-auth",
+            "examples/auth_logs/sample_auth.log",
+            "--include-explanations",
+        ],
+    )
+
+    assert result.exit_code == 0
+    report_path = next((tmp_path / "configured-reports").glob("*.json"))
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert all("explanation" in alert for alert in report["alerts"])
+
+
+def test_cli_no_include_explanations_overrides_config_true(tmp_path: Path) -> None:
+    config_path = write_reporting_config(tmp_path, include_explanations=True)
+
+    result = runner.invoke(
+        app,
+        [
+            "--config",
+            str(config_path),
+            "scan-auth",
+            "examples/auth_logs/sample_auth.log",
+            "--no-include-explanations",
+        ],
+    )
+
+    assert result.exit_code == 0
+    report_path = next((tmp_path / "configured-reports").glob("*.json"))
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert all("explanation" not in alert for alert in report["alerts"])
+
+
+def test_invalid_config_fails_before_scan_pipeline(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    config_path = tmp_path / "invalid.toml"
+    config_path.write_text("[reporting\noutput_dir = 'reports'", encoding="utf-8")
+    pipeline_called = False
+
+    def fake_run_auth_scan(**_kwargs: object) -> None:
+        nonlocal pipeline_called
+        pipeline_called = True
+
+    monkeypatch.setattr("sentinellite.main.run_auth_scan", fake_run_auth_scan)
+
+    result = runner.invoke(
+        app,
+        ["--config", str(config_path), "scan-auth", "auth.log"],
+    )
+
+    assert result.exit_code != 0
+    assert "Failed to load configuration" in result.stdout
+    assert "Invalid TOML config file" in result.stdout
+    assert "Traceback" not in result.stdout
+    assert pipeline_called is False
+    assert not (tmp_path / "reports").exists()
+
+
+def test_missing_config_fails_before_scan_pipeline(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    config_path = tmp_path / "missing.toml"
+    pipeline_called = False
+
+    def fake_run_auth_scan(**_kwargs: object) -> None:
+        nonlocal pipeline_called
+        pipeline_called = True
+
+    monkeypatch.setattr("sentinellite.main.run_auth_scan", fake_run_auth_scan)
+
+    result = runner.invoke(
+        app,
+        ["--config", str(config_path), "scan-auth", "auth.log"],
+    )
+
+    assert result.exit_code != 0
+    assert "Failed to load configuration" in result.stdout
+    assert "Config file not found" in result.stdout
+    assert "Traceback" not in result.stdout
+    assert pipeline_called is False
+
+
+def test_config_file_in_current_directory_is_not_auto_discovered(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    write_reporting_config(tmp_path, include_explanations=True)
+    captured: dict[str, object] = {}
+
+    def fake_run_auth_scan(
+        log_path: Path,
+        output_dir: Path,
+        *,
+        include_explanations: bool,
+    ) -> tuple[AuthScanSummary, list[ScoredAlert]]:
+        captured.update(
+            output_dir=output_dir,
+            include_explanations=include_explanations,
+        )
+        return (
+            AuthScanSummary(
+                log_path=str(log_path),
+                auth_events_count=0,
+                security_events_count=0,
+                detection_matches_count=0,
+                scored_alerts_count=0,
+                report_path="reports/auth-alerts.json",
+            ),
+            [],
+        )
+
+    monkeypatch.setattr("sentinellite.main.run_auth_scan", fake_run_auth_scan)
+
+    result = runner.invoke(app, ["scan-auth", "auth.log"])
+
+    assert result.exit_code == 0
+    assert captured == {
+        "output_dir": Path("reports"),
+        "include_explanations": False,
+    }
 
 
 def test_scan_auth_command_without_flag_writes_legacy_json(tmp_path: Path) -> None:
