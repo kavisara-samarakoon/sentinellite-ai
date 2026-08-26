@@ -47,6 +47,30 @@ jobs:
           python -m sentinellite scan-auth examples/auth_logs/sample_auth.log | tee /tmp/sentinellite-auth-smoke.txt
           grep -Fq "Deterministic Alert Explanations" /tmp/sentinellite-auth-smoke.txt
 
+      - name: Run authentication JSON explanation smoke test
+        run: |
+          smoke_dir=/tmp/sentinellite-json-explanation-smoke
+          python -m sentinellite scan-auth examples/auth_logs/sample_auth.log --output-dir "$smoke_dir" --include-explanations
+          python - "$smoke_dir" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          report_paths = list(Path(sys.argv[1]).glob("*.json"))
+          assert len(report_paths) == 1
+          report = json.loads(report_paths[0].read_text(encoding="utf-8"))
+          assert set(report) == {
+              "report_id",
+              "report_type",
+              "generated_at",
+              "alert_count",
+              "alerts",
+          }
+          assert report["alerts"]
+          assert all("explanation" in alert for alert in report["alerts"])
+          assert "explanations" not in report
+          PY
+
       - name: Run process scan smoke test
         run: python -m sentinellite scan-process
 

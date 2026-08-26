@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This guide provides a safe, professional flow for demonstrating the SentinelLite AI `v0.3.0-alpha` in-development milestone. The demonstration focuses on implemented defensive monitoring, transparent detection results, local deterministic alert explanations, and the project's current limitations.
+This guide provides a safe, professional flow for demonstrating the SentinelLite AI `v0.4.0-alpha` in-development milestone. The demonstration focuses on implemented defensive monitoring, transparent detection results, local deterministic alert explanations, optional JSON explanation export, and the project's current limitations.
 
 ## Demo Environment
 
@@ -76,6 +76,54 @@ python -m sentinellite scan-auth examples/auth_logs/sample_auth.log
 
 After the existing alert table, review the `Deterministic Alert Explanations` panels. Explain that each panel comes from a local rule template and uses evidence already present in the alert. Explanation panels appear only when scored alerts exist; a no-alert scan does not print an empty explanation section.
 
+### Optional JSON Explanation Export Demo
+
+First, write a default report without JSON explanations:
+
+```bash
+python -m sentinellite scan-auth examples/auth_logs/sample_auth.log --output-dir /tmp/sentinellite-default-report
+```
+
+Then write an opt-in report with nested deterministic explanations:
+
+```bash
+python -m sentinellite scan-auth examples/auth_logs/sample_auth.log --output-dir /tmp/sentinellite-explained-report --include-explanations
+```
+
+Use the Python standard library to verify both reports:
+
+```bash
+python - <<'PY'
+import json
+from pathlib import Path
+
+default_path = max(Path("/tmp/sentinellite-default-report").glob("*.json"))
+explained_path = max(Path("/tmp/sentinellite-explained-report").glob("*.json"))
+
+default_report = json.loads(default_path.read_text(encoding="utf-8"))
+explained_report = json.loads(explained_path.read_text(encoding="utf-8"))
+expected_keys = {
+    "report_id",
+    "report_type",
+    "generated_at",
+    "alert_count",
+    "alerts",
+}
+
+assert set(default_report) == expected_keys
+assert set(explained_report) == expected_keys
+assert default_report["alerts"]
+assert explained_report["alerts"]
+assert all("explanation" not in alert for alert in default_report["alerts"])
+assert all("explanation" in alert for alert in explained_report["alerts"])
+assert "explanations" not in default_report
+assert "explanations" not in explained_report
+print("Default and opt-in JSON reports verified.")
+PY
+```
+
+Both scans still display terminal explanation panels when scored alerts exist. The flag controls only whether explanation objects are also exported inside the JSON alerts.
+
 ## Process Scan Demo
 
 Observe the processes currently running on the demo system:
@@ -141,9 +189,7 @@ Each alert contains information suitable for review and later integration, inclu
 - Evidence
 - Recommendations
 
-Open a generated JSON report after a scan to show how terminal summaries connect to structured, reviewable alert data.
-
-Deterministic explanations are displayed only in the terminal for this milestone. The JSON report schema is unchanged and does not export explanation objects yet.
+Open a generated JSON report after a scan to show how terminal summaries connect to structured, reviewable alert data. Default reports contain no explanation objects. Reports created with `--include-explanations` add one deterministic `explanation` object inside each alert, while preserving the same five top-level fields and adding no top-level `explanations` field.
 
 ## Safe Demo Notes
 
@@ -169,13 +215,13 @@ Only demonstrate the project on systems and data that you are authorized to obse
 7. Run the file integrity observation scan.
 8. Create and scan a file integrity baseline.
 9. Review deterministic explanation panels when a scan produces alerts.
-10. Open a generated JSON report and explain that its schema remains unchanged.
+10. Compare default and opt-in JSON reports and show the nested per-alert explanation.
 11. Explain the current limitations and next roadmap items.
 
 ## Current Limitations
 
 - There is no persistent monitoring daemon yet.
 - There is no dashboard yet.
-- JSON explanation export is not included yet.
+- JSON explanation export requires the explicit `--include-explanations` option.
 - AI-assisted explanation is not implemented yet.
 - The project has a Linux-first design; macOS is supported as a development mode.
