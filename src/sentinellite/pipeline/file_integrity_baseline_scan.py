@@ -10,6 +10,7 @@ from sentinellite.baseline.file_integrity import (
 )
 from sentinellite.collectors.file_integrity import collect_file_integrity
 from sentinellite.detection.engine import detect_events
+from sentinellite.detection.rules import DetectionRule
 from sentinellite.normalization.file_integrity_baseline import (
     file_integrity_baseline_comparison_to_security_event,
 )
@@ -56,6 +57,7 @@ def run_file_integrity_baseline_scan(
     output_dir: Path | str = "reports",
     *,
     include_explanations: bool = False,
+    rules: Sequence[DetectionRule] | None = None,
 ) -> FileIntegrityBaselineScanSummary:
     """Compare current observations with a saved baseline and report scored alerts."""
     loaded_baseline_path = Path(baseline_path)
@@ -68,7 +70,7 @@ def run_file_integrity_baseline_scan(
         file_integrity_baseline_comparison_to_security_event(comparison)
         for comparison in comparisons
     ]
-    detection_matches = detect_events(security_events)
+    detection_matches = detect_events(security_events, rules=rules)
     scored_alerts = score_rule_matches(detection_matches)
     report_path = write_alert_report(
         scored_alerts,

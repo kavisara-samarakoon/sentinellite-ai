@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from sentinellite.collectors.network import NetworkConnection
+from sentinellite.detection.rules import active_rules_from_disabled_ids
 from sentinellite.pipeline.network_scan import NetworkScanSummary, run_network_scan
 from sentinellite.reporting.json_reporter import read_alert_report
 
@@ -105,6 +106,33 @@ def test_network_scan_includes_explanation_when_requested(
     alert = report_data["alerts"][0]
     assert alert["rule_id"] == "NET-001"
     assert alert["explanation"]["rule_id"] == "NET-001"
+    assert "explanations" not in report_data
+
+
+def test_network_scan_can_disable_unusual_listening_port_rule(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        "sentinellite.pipeline.network_scan.collect_network_connections",
+        lambda: [
+            create_connection(
+                fd=8,
+                local_port=8080,
+                remote_address=None,
+                remote_port=None,
+                status="LISTEN",
+            )
+        ],
+    )
+    rules = active_rules_from_disabled_ids(["NET-001"])
+
+    summary = run_network_scan(output_dir=tmp_path, rules=rules)
+
+    assert summary.detection_matches_count == 0
+    assert summary.scored_alerts_count == 0
+    report_data = read_alert_report(summary.report_path)
+    assert report_data["alerts"] == []
     assert "explanations" not in report_data
 
 

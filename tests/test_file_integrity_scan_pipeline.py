@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from sentinellite.collectors.file_integrity import FileIntegrityRecord
+from sentinellite.detection.rules import active_rules_from_disabled_ids
 from sentinellite.pipeline.file_integrity_scan import (
     FileIntegrityScanSummary,
     run_file_integrity_scan,
@@ -117,6 +118,40 @@ def test_file_integrity_scan_includes_explanations_when_requested(
         alert["explanation"]["rule_id"] == alert["rule_id"]
         for alert in report_data["alerts"]
     )
+    assert "explanations" not in report_data
+
+
+def test_file_integrity_scan_can_disable_only_missing_file_rule(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monitored_paths = ["/selected/missing.txt"]
+    monkeypatch.setattr(
+        "sentinellite.pipeline.file_integrity_scan.collect_file_integrity",
+        lambda paths: [
+            FileIntegrityRecord(
+                path="/selected/missing.txt",
+                exists=False,
+                is_file=False,
+                size_bytes=None,
+                modified_time_epoch=None,
+                sha256=None,
+                error="Path does not exist: /selected/missing.txt",
+            )
+        ],
+    )
+    rules = active_rules_from_disabled_ids(["FIM-001"])
+
+    summary = run_file_integrity_scan(
+        monitored_paths,
+        output_dir=tmp_path,
+        rules=rules,
+    )
+
+    assert summary.detection_matches_count == 1
+    assert summary.scored_alerts_count == 1
+    report_data = read_alert_report(summary.report_path)
+    assert [alert["rule_id"] for alert in report_data["alerts"]] == ["FIM-002"]
     assert "explanations" not in report_data
 
 

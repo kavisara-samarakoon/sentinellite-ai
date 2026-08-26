@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from sentinellite.detection.rules import active_rules_from_disabled_ids
 from sentinellite.pipeline.auth_scan import AuthScanSummary, run_auth_scan
 from sentinellite.reporting.json_reporter import read_alert_report
 from sentinellite.scoring.risk import ScoredAlert
@@ -67,6 +68,30 @@ def test_auth_scan_report_includes_explanations_when_requested(tmp_path: Path) -
         alert["explanation"]["rule_id"] == alert["rule_id"]
         for alert in report_data["alerts"]
     )
+    assert "explanations" not in report_data
+
+
+def test_auth_scan_can_disable_failed_login_rule_and_preserve_other_alerts(
+    tmp_path: Path,
+) -> None:
+    sample_log = Path("examples/auth_logs/sample_auth.log")
+    rules = active_rules_from_disabled_ids(["AUTH-001"])
+
+    summary, scored_alerts = run_auth_scan(
+        sample_log,
+        output_dir=tmp_path,
+        report_filename="auth-filtered-rules.json",
+        rules=rules,
+    )
+
+    assert summary.detection_matches_count == 2
+    assert summary.scored_alerts_count == 2
+    assert [alert.rule_id for alert in scored_alerts] == ["AUTH-002", "AUTH-003"]
+    report_data = read_alert_report(summary.report_path)
+    assert [alert["rule_id"] for alert in report_data["alerts"]] == [
+        "AUTH-002",
+        "AUTH-003",
+    ]
     assert "explanations" not in report_data
 
 

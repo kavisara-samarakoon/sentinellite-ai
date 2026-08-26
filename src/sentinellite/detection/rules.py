@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from ipaddress import ip_address, ip_network
 
@@ -443,3 +443,18 @@ DEFAULT_RULES: list[DetectionRule] = [
         condition=matches_file_integrity_baseline_comparison_error,
     ),
 ]
+
+
+def active_rules_from_disabled_ids(
+    disabled_ids: Iterable[str],
+) -> list[DetectionRule]:
+    """Return registered rules except those explicitly disabled by rule ID."""
+    disabled_id_set = set(disabled_ids)
+    registered_ids = {rule.rule_id for rule in DEFAULT_RULES}
+    unknown_ids = sorted(disabled_id_set - registered_ids)
+
+    if unknown_ids:
+        joined_ids = ", ".join(unknown_ids)
+        raise ValueError(f"Unknown disabled rule ID(s): {joined_ids}")
+
+    return [rule for rule in DEFAULT_RULES if rule.rule_id not in disabled_id_set]

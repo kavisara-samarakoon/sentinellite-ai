@@ -42,6 +42,12 @@ jobs:
       - name: Run CLI status smoke test
         run: python -m sentinellite
 
+      - name: Create and use default TOML config
+        run: |
+          python -m sentinellite config-init --path /tmp/sentinellite.toml
+          test -f /tmp/sentinellite.toml
+          python -m sentinellite --config /tmp/sentinellite.toml scan-auth examples/auth_logs/sample_auth.log
+
       - name: Run authentication scan smoke test
         run: |
           python -m sentinellite scan-auth examples/auth_logs/sample_auth.log | tee /tmp/sentinellite-auth-smoke.txt
@@ -70,6 +76,63 @@ jobs:
           assert all("explanation" in alert for alert in report["alerts"])
           assert "explanations" not in report
           PY
+
+      - name: Validate config-driven JSON explanations
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          Path("/tmp/sentinellite-explanations.toml").write_text(
+              """config_version = 1
+
+          [reporting]
+          output_dir = "/tmp/sentinellite-config-explanation-smoke"
+          include_explanations = true
+          """,
+              encoding="utf-8",
+          )
+          PY
+          python -m sentinellite --config /tmp/sentinellite-explanations.toml scan-auth examples/auth_logs/sample_auth.log
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report_paths = list(Path("/tmp/sentinellite-config-explanation-smoke").glob("*.json"))
+          assert len(report_paths) == 1
+          report = json.loads(report_paths[0].read_text(encoding="utf-8"))
+          assert set(report) == {
+              "report_id",
+              "report_type",
+              "generated_at",
+              "alert_count",
+              "alerts",
+          }
+          assert report["alerts"]
+          assert all("explanation" in alert for alert in report["alerts"])
+          assert "explanations" not in report
+          PY
+
+      - name: Validate disabled process module
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          Path("/tmp/sentinellite-process-disabled.toml").write_text(
+              """config_version = 1
+
+          [modules]
+          process = false
+          """,
+              encoding="utf-8",
+          )
+          PY
+          set +e
+          python -m sentinellite --config /tmp/sentinellite-process-disabled.toml scan-process > /tmp/sentinellite-process-disabled.txt 2>&1
+          status=$?
+          set -e
+          cat /tmp/sentinellite-process-disabled.txt
+          test "$status" -ne 0
+          grep -Fq "Process monitoring is disabled by configuration." /tmp/sentinellite-process-disabled.txt
 
       - name: Run process scan smoke test
         run: python -m sentinellite scan-process
