@@ -27,14 +27,10 @@ Terminal explanation panels continue to appear when scored alerts exist. Real AI
 ## Validation
 
 - Ruff: passed
-- Pytest: 308 tests passed
-- macOS development validation: passed
-- Default authentication JSON report: verified without explanation objects
-- Opt-in authentication JSON report: verified with one nested explanation per alert
-- Report top-level compatibility: verified
-- Existing terminal `Deterministic Alert Explanations` smoke check: preserved
-- Ubuntu ARM64 validation for `v0.4.0-alpha`: pending
+- Pytest: 308 tests passed on macOS development validation
+- Ubuntu ARM64 validation: passed
 
+Ubuntu ARM64 validation passed on an Ubuntu ARM64 VM using Python 3.14.4. Ruff passed, Pytest passed with 308 tests, the CLI displayed `SentinelLite AI v0.4.0-alpha`, the default authentication scan kept legacy JSON output, and the `--include-explanations` authentication scan wrote nested explanation objects for all four alerts while preserving the same five top-level report fields.
 ## Safety Scope
 
 - Deterministic, local, rule-based guidance only
