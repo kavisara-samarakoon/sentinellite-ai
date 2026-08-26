@@ -94,6 +94,19 @@ def _active_rules(ctx: typer.Context) -> list[DetectionRule] | None:
     return active_rules_from_disabled_ids(disabled_ids)
 
 
+def _require_module_enabled(
+    ctx: typer.Context,
+    module_name: str,
+    display_name: str,
+) -> None:
+    config = _selected_config(ctx)
+    if not getattr(config.modules, module_name):
+        console.print(
+            f"[red][!] {display_name} monitoring is disabled by configuration.[/red]"
+        )
+        raise typer.Exit(code=1)
+
+
 def show_banner(config: dict[str, Any]) -> None:
     app_name = config["app"].get("name", "SentinelLite AI")
 
@@ -278,6 +291,7 @@ def scan_auth_command(
     ] = None,
 ) -> None:
     """Scan an authentication log file and generate a JSON alert report."""
+    _require_module_enabled(ctx, "authentication", "Authentication")
     effective_output_dir, effective_include_explanations = _reporting_options(
         ctx,
         output_dir,
@@ -345,6 +359,7 @@ def scan_process_command(
     ] = None,
 ) -> None:
     """Scan running processes and generate a JSON alert report."""
+    _require_module_enabled(ctx, "process", "Process")
     effective_output_dir, effective_include_explanations = _reporting_options(
         ctx,
         output_dir,
@@ -411,6 +426,7 @@ def scan_network_command(
     ] = None,
 ) -> None:
     """Collect network connection observations and generate a JSON alert report."""
+    _require_module_enabled(ctx, "network", "Network")
     effective_output_dir, effective_include_explanations = _reporting_options(
         ctx,
         output_dir,
@@ -481,6 +497,7 @@ def scan_files_command(
     ] = None,
 ) -> None:
     """Observe selected file paths and generate a JSON alert report."""
+    _require_module_enabled(ctx, "file_integrity", "File integrity")
     effective_output_dir, effective_include_explanations = _reporting_options(
         ctx,
         output_dir,
@@ -540,6 +557,7 @@ def scan_files_command(
 
 @app.command("baseline-files")
 def baseline_files_command(
+    ctx: typer.Context,
     paths: Annotated[
         list[Path],
         typer.Argument(help="One or more explicit file paths to record in the baseline."),
@@ -553,6 +571,7 @@ def baseline_files_command(
     ],
 ) -> None:
     """Create a file integrity baseline for explicitly selected paths."""
+    _require_module_enabled(ctx, "file_integrity", "File integrity")
     try:
         summary = create_file_integrity_baseline(
             paths=[str(path) for path in paths],
@@ -611,6 +630,7 @@ def scan_files_baseline_command(
     ] = None,
 ) -> None:
     """Scan the exact paths stored in a file integrity baseline."""
+    _require_module_enabled(ctx, "file_integrity", "File integrity")
     effective_output_dir, effective_include_explanations = _reporting_options(
         ctx,
         output_dir,

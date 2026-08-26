@@ -358,7 +358,7 @@ def test_scan_auth_without_config_uses_builtin_reporting_defaults(
         ),
     ],
 )
-def test_json_scan_commands_apply_reporting_and_rule_settings_without_module_gating(
+def test_json_scan_commands_apply_configured_reporting_and_rule_settings(
     command_args: list[str],
     pipeline_name: str,
     monkeypatch: pytest.MonkeyPatch,
@@ -373,10 +373,10 @@ output_dir = "configured-reports"
 include_explanations = true
 
 [modules]
-authentication = false
-process = false
-network = false
-file_integrity = false
+authentication = true
+process = true
+network = true
+file_integrity = true
 
 [rules]
 disabled_ids = ["AUTH-001", "PROC-001", "NET-001", "FIM-001", "FIM-004"]
@@ -432,6 +432,154 @@ disabled_ids = ["AUTH-001", "PROC-001", "NET-001", "FIM-001", "FIM-004"]
     assert [rule.rule_id for rule in rules] == [
         rule.rule_id for rule in DEFAULT_RULES if rule.rule_id not in disabled_ids
     ]
+
+
+@pytest.mark.parametrize(
+    ("command_name", "pipeline_name", "module_name", "disabled_message"),
+    [
+        (
+            "scan-auth",
+            "run_auth_scan",
+            "authentication",
+            "Authentication monitoring is disabled by configuration.",
+        ),
+        (
+            "scan-process",
+            "run_process_scan",
+            "process",
+            "Process monitoring is disabled by configuration.",
+        ),
+        (
+            "scan-network",
+            "run_network_scan",
+            "network",
+            "Network monitoring is disabled by configuration.",
+        ),
+        (
+            "scan-files",
+            "run_file_integrity_scan",
+            "file_integrity",
+            "File integrity monitoring is disabled by configuration.",
+        ),
+        (
+            "baseline-files",
+            "create_file_integrity_baseline",
+            "file_integrity",
+            "File integrity monitoring is disabled by configuration.",
+        ),
+        (
+            "scan-files-baseline",
+            "run_file_integrity_baseline_scan",
+            "file_integrity",
+            "File integrity monitoring is disabled by configuration.",
+        ),
+    ],
+)
+def test_disabled_module_blocks_command_before_pipeline_or_baseline_write(
+    command_name: str,
+    pipeline_name: str,
+    module_name: str,
+    disabled_message: str,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    config_path = tmp_path / "sentinellite.toml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "config_version = 1",
+                "",
+                "[reporting]",
+                'output_dir = "configured-reports"',
+                "include_explanations = true",
+                "",
+                "[modules]",
+                f"{module_name} = false",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    pipeline_called = False
+
+    def fake_pipeline(*_args: object, **_kwargs: object) -> None:
+        nonlocal pipeline_called
+        pipeline_called = True
+
+    monkeypatch.setattr(f"sentinellite.main.{pipeline_name}", fake_pipeline)
+    selected_path = tmp_path / "selected.txt"
+    baseline_path = tmp_path / "baseline.json"
+    command_args = {
+        "scan-auth": ["scan-auth", str(tmp_path / "auth.log")],
+        "scan-process": ["scan-process"],
+        "scan-network": ["scan-network"],
+        "scan-files": ["scan-files", str(selected_path)],
+        "baseline-files": [
+            "baseline-files",
+            str(selected_path),
+            "--baseline-path",
+            str(baseline_path),
+        ],
+        "scan-files-baseline": [
+            "scan-files-baseline",
+            "--baseline-path",
+            str(baseline_path),
+        ],
+    }
+
+    result = runner.invoke(
+        app,
+        ["--config", str(config_path), *command_args[command_name]],
+    )
+
+    assert result.exit_code != 0
+    assert disabled_message in result.stdout
+    assert "Traceback" not in result.stdout
+    assert pipeline_called is False
+    assert not (tmp_path / "configured-reports").exists()
+    assert not baseline_path.exists()
+
+
+def test_missing_modules_section_keeps_scan_enabled(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    config_path = write_reporting_config(tmp_path)
+    pipeline_called = False
+
+    def fake_run_auth_scan(
+        log_path: Path,
+        output_dir: Path,
+        *,
+        include_explanations: bool,
+        rules: list[DetectionRule] | None,
+    ) -> tuple[AuthScanSummary, list[ScoredAlert]]:
+        nonlocal pipeline_called
+        pipeline_called = True
+        assert output_dir == tmp_path / "configured-reports"
+        assert include_explanations is False
+        assert rules is None
+        return (
+            AuthScanSummary(
+                log_path=str(log_path),
+                auth_events_count=0,
+                security_events_count=0,
+                detection_matches_count=0,
+                scored_alerts_count=0,
+                report_path=str(output_dir / "auth-alerts.json"),
+            ),
+            [],
+        )
+
+    monkeypatch.setattr("sentinellite.main.run_auth_scan", fake_run_auth_scan)
+
+    result = runner.invoke(
+        app,
+        ["--config", str(config_path), "scan-auth", "auth.log"],
+    )
+
+    assert result.exit_code == 0
+    assert pipeline_called is True
 
 
 def test_config_disabling_auth_rule_suppresses_only_failed_login_alerts(
