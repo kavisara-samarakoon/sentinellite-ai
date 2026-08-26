@@ -26,6 +26,8 @@ class FileIntegrityScanSummary:
 def run_file_integrity_scan(
     paths: Sequence[Path | str],
     output_dir: Path | str = "reports",
+    *,
+    include_explanations: bool = False,
 ) -> FileIntegrityScanSummary:
     """Observe selected file paths and write scored detection alerts to JSON."""
     records = collect_file_integrity(paths)
@@ -41,6 +43,7 @@ def run_file_integrity_scan(
     report_path = write_alert_report(
         scored_alerts,
         output_dir=output_dir,
+        include_explanations=include_explanations,
     )
 
     return FileIntegrityScanSummary(

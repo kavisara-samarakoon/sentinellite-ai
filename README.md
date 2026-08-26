@@ -6,7 +6,7 @@ The project is a Python CLI tool focused on defensive Linux security monitoring.
 
 ## Current Status
 
-Current milestone: `v0.3.0-alpha` (in development; not released)
+Current milestone: `v0.4.0-alpha` (in development; not released)
 
 Current milestone status:
 
@@ -44,8 +44,9 @@ Current milestone status:
 - Deterministic explanation model and templates implemented for AUTH, PROC, NET, and FIM rules
 - Local explanation generation and Rich terminal panels implemented
 - Deterministic explanations displayed by scan commands when scored alerts exist
-- JSON alert report schema remains unchanged for the `v0.3.0-alpha` milestone
-- 288 automated tests passing
+- Optional deterministic JSON explanation export implemented behind `--include-explanations`
+- Default JSON alert reports retain the existing five-field top-level structure
+- 308 automated tests passing
 
 Baseline-backed file integrity monitoring is implemented and has been validated on Ubuntu ARM64. See the [Linux ARM64 validation notes](docs/linux-validation.md).
 
@@ -55,7 +56,9 @@ See the [v0.1.0-alpha release notes](docs/release-notes-v0.1.0-alpha.md).
 
 See the [v0.2.0-alpha release notes](docs/release-notes-v0.2.0-alpha.md) for the baseline-backed file integrity milestone.
 
-See the [v0.3.0-alpha release notes](docs/release-notes-v0.3.0-alpha.md) for the current deterministic alert explanation milestone.
+See the [v0.3.0-alpha release notes](docs/release-notes-v0.3.0-alpha.md) for the deterministic CLI alert explanation milestone.
+
+See the [v0.4.0-alpha release notes](docs/release-notes-v0.4.0-alpha.md) for the current optional JSON explanation export milestone.
 
 ## Security Scope
 
@@ -128,6 +131,7 @@ It is not intended for:
 - Deterministic alert explanation model and rule templates
 - Local explanation generation with generic fallback guidance
 - Rich terminal explanation panels for scored alerts
+- Optional nested JSON alert explanations requested with `--include-explanations`
 
 ## Planned Features
 
@@ -191,6 +195,14 @@ python -m sentinellite scan-auth examples/auth_logs/sample_auth.log
 ```
 
 When the scan produces scored alerts, the existing alert table is followed by a `Deterministic Alert Explanations` section. Its local rule templates summarize why each rule matched, list possible causes, and recommend investigation steps. No explanation section is printed when there are no scored alerts.
+
+Terminal explanation panels continue to appear whenever a scan produces scored alerts. To also export those deterministic explanations into the JSON alert report, pass the explicit `--include-explanations` option:
+
+```bash
+python -m sentinellite scan-auth examples/auth_logs/sample_auth.log --include-explanations
+```
+
+Without the option, JSON reports remain unchanged. With the option, each alert receives its own nested `explanation` object. The report does not add a top-level `explanations` field.
 
 Scan the current running process list:
 
@@ -386,28 +398,37 @@ SentinelLite AI writes alert reports to the `reports/` directory.
 
 Reports are generated as JSON files. Local reports are ignored by Git to avoid committing machine-specific scan output.
 
-The `v0.3.0-alpha` milestone adds explanations to terminal output only. JSON reports retain their existing schema and do not include explanation objects yet.
+By default, reports retain the same five top-level fields: `report_id`, `report_type`, `generated_at`, `alert_count`, and `alerts`. Passing `--include-explanations` adds a nested `explanation` object to each alert while leaving that top-level structure unchanged. No top-level `explanations` field is added.
 
 Example report structure:
 
 ```json
 {
+  "report_id": "sentinellite-report-...",
   "report_type": "sentinellite_alert_report",
+  "generated_at": "2026-08-26T15:12:48.437809+00:00",
   "alert_count": 4,
   "alerts": [
     {
       "rule_id": "AUTH-001",
       "risk_score": 50,
       "risk_level": "medium",
-      "message": "Failed SSH login attempt"
+      "message": "Failed SSH login attempt",
+      "explanation": {
+        "rule_id": "AUTH-001",
+        "title": "Failed SSH Login Attempt",
+        "confidence": "medium"
+      }
     }
   ]
 }
 ```
 
+The nested `explanation` shown above is present only in an opt-in report. Explanations are generated locally from deterministic rule templates and existing alert evidence.
+
 ## Testing
 
-The current test suite contains 288 tests covering collectors, baseline models and persistence, normalization, detection, scoring, reporting, deterministic explanations, pipelines, and CLI behavior.
+The current test suite contains 308 tests covering collectors, baseline models and persistence, normalization, detection, scoring, reporting, deterministic explanations, pipelines, and CLI behavior.
 
 Run all tests:
 
@@ -428,6 +449,7 @@ ruff check src tests
 pytest
 python -m sentinellite
 python -m sentinellite scan-auth examples/auth_logs/sample_auth.log
+python -m sentinellite scan-auth examples/auth_logs/sample_auth.log --include-explanations
 python -m sentinellite scan-process
 python -m sentinellite scan-network
 python -m sentinellite scan-files README.md
@@ -505,6 +527,13 @@ File integrity rules report current observation conditions such as an absent pat
 - Baseline-backed file integrity creation, comparison, detection, reporting, and CLI workflow
 - Deterministic, local alert explanations in CLI output
 - Screenshots and demo evidence
+
+### Version 0.4
+
+- Optional deterministic explanation export inside JSON alerts
+- Explicit `--include-explanations` support across alert-producing scan commands
+- Backward-compatible default JSON reports
+- CI validation for nested opt-in explanation objects
 
 ### Version 1.0
 

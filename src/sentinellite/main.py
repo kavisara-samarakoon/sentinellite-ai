@@ -10,6 +10,7 @@ from rich.table import Table
 from sentinellite.collectors.system import SystemInfo, collect_system_info
 from sentinellite.config.loader import ConfigError, load_config
 from sentinellite.explanations.cli import build_explanation_panels
+from sentinellite.explanations.evidence import build_alert_evidence_summary
 from sentinellite.explanations.generator import generate_alert_explanation
 from sentinellite.pipeline.auth_scan import run_auth_scan
 from sentinellite.pipeline.file_integrity_baseline_scan import (
@@ -22,7 +23,7 @@ from sentinellite.pipeline.process_scan import run_process_scan
 from sentinellite.reporting.json_reporter import read_alert_report
 
 console = Console()
-CURRENT_VERSION = "0.3.0-alpha"
+CURRENT_VERSION = "0.4.0-alpha"
 
 app = typer.Typer(
     help="SentinelLite AI - Lightweight Linux endpoint detection and monitoring agent.",
@@ -36,31 +37,6 @@ def _alert_value(alert: object, field_name: str) -> object | None:
     return getattr(alert, field_name, None)
 
 
-def _build_alert_evidence_summary(alert: object) -> dict[str, object]:
-    evidence_summary: dict[str, object] = {}
-
-    for output_name, field_name in (
-        ("rule_id", "rule_id"),
-        ("severity", "severity"),
-        ("score", "risk_score"),
-        ("event_type", "event_type"),
-        ("source", "source"),
-        ("message", "message"),
-    ):
-        value = _alert_value(alert, field_name)
-        if value is not None:
-            evidence_summary[output_name] = value
-
-    alert_evidence = _alert_value(alert, "evidence")
-    if isinstance(alert_evidence, Mapping):
-        for field_name in ("path", "status"):
-            value = alert_evidence.get(field_name)
-            if value is not None:
-                evidence_summary[field_name] = value
-
-    return evidence_summary
-
-
 def _show_alert_explanations(alerts: Iterable[object]) -> None:
     explanations = []
 
@@ -71,7 +47,7 @@ def _show_alert_explanations(alerts: Iterable[object]) -> None:
         explanations.append(
             generate_alert_explanation(
                 rule_id,
-                _build_alert_evidence_summary(alert),
+                build_alert_evidence_summary(alert),
             )
         )
 
@@ -216,12 +192,18 @@ def main(ctx: typer.Context) -> None:
 def scan_auth_command(
     log_path: Path,
     output_dir: Path = Path("reports"),
+    include_explanations: bool = typer.Option(
+        False,
+        "--include-explanations",
+        help="Include deterministic alert explanations in the JSON report.",
+    ),
 ) -> None:
     """Scan an authentication log file and generate a JSON alert report."""
     try:
         summary, scored_alerts = run_auth_scan(
             log_path=log_path,
             output_dir=output_dir,
+            include_explanations=include_explanations,
         )
     except FileNotFoundError as error:
         console.print(f"[red][!] {error}[/red]")
@@ -264,9 +246,17 @@ def scan_auth_command(
 @app.command("scan-process")
 def scan_process_command(
     output_dir: Path = Path("reports"),
+    include_explanations: bool = typer.Option(
+        False,
+        "--include-explanations",
+        help="Include deterministic alert explanations in the JSON report.",
+    ),
 ) -> None:
     """Scan running processes and generate a JSON alert report."""
-    summary = run_process_scan(output_dir=output_dir)
+    summary = run_process_scan(
+        output_dir=output_dir,
+        include_explanations=include_explanations,
+    )
 
     console.print(Panel.fit("Process Scan Complete", title="SentinelLite AI", border_style="green"))
 
@@ -309,9 +299,17 @@ def scan_process_command(
 @app.command("scan-network")
 def scan_network_command(
     output_dir: Path = Path("reports"),
+    include_explanations: bool = typer.Option(
+        False,
+        "--include-explanations",
+        help="Include deterministic alert explanations in the JSON report.",
+    ),
 ) -> None:
     """Collect network connection observations and generate a JSON alert report."""
-    summary = run_network_scan(output_dir=output_dir)
+    summary = run_network_scan(
+        output_dir=output_dir,
+        include_explanations=include_explanations,
+    )
 
     console.print(Panel.fit("Network Scan Complete", title="SentinelLite AI", border_style="green"))
 
@@ -358,9 +356,18 @@ def scan_files_command(
         typer.Argument(help="One or more explicit file paths to observe without modification."),
     ],
     output_dir: Path = Path("reports"),
+    include_explanations: bool = typer.Option(
+        False,
+        "--include-explanations",
+        help="Include deterministic alert explanations in the JSON report.",
+    ),
 ) -> None:
     """Observe selected file paths and generate a JSON alert report."""
-    summary = run_file_integrity_scan(paths=paths, output_dir=output_dir)
+    summary = run_file_integrity_scan(
+        paths=paths,
+        output_dir=output_dir,
+        include_explanations=include_explanations,
+    )
 
     console.print(
         Panel.fit(
@@ -469,12 +476,18 @@ def scan_files_baseline_command(
             help="Directory for the generated JSON alert report.",
         ),
     ] = Path("reports"),
+    include_explanations: bool = typer.Option(
+        False,
+        "--include-explanations",
+        help="Include deterministic alert explanations in the JSON report.",
+    ),
 ) -> None:
     """Scan the exact paths stored in a file integrity baseline."""
     try:
         summary = run_file_integrity_baseline_scan(
             baseline_path=baseline_path,
             output_dir=output_dir,
+            include_explanations=include_explanations,
         )
     except FileNotFoundError as error:
         console.print(f"[red][!] {error}[/red]")

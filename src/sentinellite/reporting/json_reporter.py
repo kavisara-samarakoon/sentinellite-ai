@@ -1,9 +1,12 @@
 import json
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from sentinellite.explanations.evidence import build_alert_evidence_summary
+from sentinellite.explanations.generator import generate_alert_explanation
 from sentinellite.scoring.risk import ScoredAlert
 
 
@@ -19,28 +22,48 @@ class AlertReport:
         return asdict(self)
 
 
-def create_alert_report(scored_alerts: list[ScoredAlert]) -> AlertReport:
+def create_alert_report(
+    scored_alerts: Sequence[ScoredAlert],
+    *,
+    include_explanations: bool = False,
+) -> AlertReport:
     generated_at = datetime.now(UTC).isoformat()
     report_id = f"sentinellite-report-{generated_at}"
+    alerts: list[dict[str, Any]] = []
+
+    for alert in scored_alerts:
+        alert_dict = alert.to_dict()
+        if include_explanations:
+            explanation = generate_alert_explanation(
+                alert.rule_id,
+                build_alert_evidence_summary(alert),
+            )
+            alert_dict["explanation"] = explanation.to_dict()
+        alerts.append(alert_dict)
 
     return AlertReport(
         report_id=report_id,
         report_type="sentinellite_alert_report",
         generated_at=generated_at,
         alert_count=len(scored_alerts),
-        alerts=[alert.to_dict() for alert in scored_alerts],
+        alerts=alerts,
     )
 
 
 def write_alert_report(
-    scored_alerts: list[ScoredAlert],
+    scored_alerts: Sequence[ScoredAlert],
     output_dir: str | Path = "reports",
     filename: str | None = None,
+    *,
+    include_explanations: bool = False,
 ) -> Path:
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    report = create_alert_report(scored_alerts)
+    report = create_alert_report(
+        scored_alerts,
+        include_explanations=include_explanations,
+    )
 
     safe_timestamp = report.generated_at.replace(":", "-").replace("+", "_")
     report_filename = filename or f"alerts-{safe_timestamp}.json"

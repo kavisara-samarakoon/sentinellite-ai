@@ -20,7 +20,11 @@ class ProcessScanSummary:
         return asdict(self)
 
 
-def run_process_scan(output_dir: Path | str = "reports") -> ProcessScanSummary:
+def run_process_scan(
+    output_dir: Path | str = "reports",
+    *,
+    include_explanations: bool = False,
+) -> ProcessScanSummary:
     """Collect process observations and write scored detection alerts to JSON."""
     processes = collect_processes()
 
@@ -35,6 +39,7 @@ def run_process_scan(output_dir: Path | str = "reports") -> ProcessScanSummary:
     report_path = write_alert_report(
         scored_alerts,
         output_dir=output_dir,
+        include_explanations=include_explanations,
     )
 
     return ProcessScanSummary(

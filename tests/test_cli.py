@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 import pytest
+from typer.main import get_command
 from typer.testing import CliRunner
 
 from sentinellite.main import app
@@ -12,6 +13,13 @@ from sentinellite.pipeline.process_scan import ProcessScanSummary
 from sentinellite.scoring.risk import ScoredAlert
 
 runner = CliRunner()
+REPORT_KEYS = {
+    "report_id",
+    "report_type",
+    "generated_at",
+    "alert_count",
+    "alerts",
+}
 
 
 def test_scan_auth_command_displays_deterministic_explanation(
@@ -41,9 +49,12 @@ def test_scan_auth_command_displays_deterministic_explanation(
     def fake_run_auth_scan(
         log_path: Path,
         output_dir: Path,
+        *,
+        include_explanations: bool,
     ) -> tuple[AuthScanSummary, list[ScoredAlert]]:
         assert log_path == tmp_path / "auth.log"
         assert output_dir == tmp_path
+        assert include_explanations is False
         return (
             AuthScanSummary(
                 log_path=str(log_path),
@@ -85,7 +96,7 @@ def test_scan_auth_command_keeps_no_alert_output_without_explanations(
 
     monkeypatch.setattr(
         "sentinellite.main.run_auth_scan",
-        lambda log_path, output_dir: (
+        lambda log_path, output_dir, **_kwargs: (
             AuthScanSummary(
                 log_path=str(log_path),
                 auth_events_count=0,
@@ -109,11 +120,95 @@ def test_scan_auth_command_keeps_no_alert_output_without_explanations(
     assert "Alert Explanation" not in result.stdout
 
 
+@pytest.mark.parametrize(
+    "command_name",
+    [
+        "scan-auth",
+        "scan-process",
+        "scan-network",
+        "scan-files",
+        "scan-files-baseline",
+    ],
+)
+def test_scan_command_registers_json_explanation_flag(command_name: str) -> None:
+    root_command = get_command(app)
+    scan_command = root_command.commands[command_name]
+    registered_options = {
+        option
+        for parameter in scan_command.params
+        for option in getattr(parameter, "opts", ())
+    }
+    assert "--include-explanations" in registered_options
+
+    explanation_option = next(
+        parameter
+        for parameter in scan_command.params
+        if "--include-explanations" in getattr(parameter, "opts", ())
+    )
+
+    assert explanation_option.help == (
+        "Include deterministic alert explanations in the JSON report."
+    )
+    assert "--ai" not in registered_options
+    assert "--llm" not in registered_options
+
+
+def test_scan_auth_command_without_flag_writes_legacy_json(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "scan-auth",
+            "examples/auth_logs/sample_auth.log",
+            "--output-dir",
+            str(tmp_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    report_paths = list(tmp_path.glob("*.json"))
+    assert len(report_paths) == 1
+    report = json.loads(report_paths[0].read_text(encoding="utf-8"))
+    assert set(report) == REPORT_KEYS
+    assert report["alerts"]
+    assert all("explanation" not in alert for alert in report["alerts"])
+    assert "Deterministic Alert Explanations" in result.stdout
+
+
+def test_scan_auth_command_with_flag_writes_json_explanations(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "scan-auth",
+            "examples/auth_logs/sample_auth.log",
+            "--output-dir",
+            str(tmp_path),
+            "--include-explanations",
+        ],
+    )
+
+    assert result.exit_code == 0
+    report_paths = list(tmp_path.glob("*.json"))
+    assert len(report_paths) == 1
+    report = json.loads(report_paths[0].read_text(encoding="utf-8"))
+    assert set(report) == REPORT_KEYS
+    assert report["alerts"]
+    assert all("explanation" in alert for alert in report["alerts"])
+    assert "Deterministic Alert Explanations" in result.stdout
+
+    explanation_text = json.dumps(
+        [alert["explanation"] for alert in report["alerts"]]
+    ).lower()
+    assert "ai detected" not in explanation_text
+    assert "malware detected" not in explanation_text
+    assert "confirmed compromise" not in explanation_text
+    assert "is compromised" not in explanation_text
+
+
 def test_default_status_describes_implemented_and_planned_modules() -> None:
     result = runner.invoke(app)
 
     assert result.exit_code == 0
-    assert "SentinelLite AI v0.3.0-alpha" in result.stdout
+    assert "SentinelLite AI v0.4.0-alpha" in result.stdout
     assert "│ Authentication Monitor  │ Enabled │" in result.stdout
     assert "│ Process Monitor         │ Enabled │" in result.stdout
     assert "│ Network Monitor         │ Enabled │" in result.stdout
@@ -131,8 +226,13 @@ def test_scan_process_command_displays_summary_and_alerts(
 ) -> None:
     report_path = tmp_path / "process-alerts.json"
 
-    def fake_run_process_scan(output_dir: Path) -> ProcessScanSummary:
+    def fake_run_process_scan(
+        output_dir: Path,
+        *,
+        include_explanations: bool,
+    ) -> ProcessScanSummary:
         assert output_dir == tmp_path
+        assert include_explanations is False
         return ProcessScanSummary(
             processes_count=3,
             security_events_count=3,
@@ -186,7 +286,7 @@ def test_scan_process_command_displays_safe_no_alert_message(
 
     monkeypatch.setattr(
         "sentinellite.main.run_process_scan",
-        lambda output_dir: ProcessScanSummary(
+        lambda output_dir, **_kwargs: ProcessScanSummary(
             processes_count=1,
             security_events_count=1,
             detection_matches_count=0,
@@ -213,8 +313,13 @@ def test_scan_network_command_displays_summary_and_alerts(
 ) -> None:
     report_path = tmp_path / "network-alerts.json"
 
-    def fake_run_network_scan(output_dir: Path) -> NetworkScanSummary:
+    def fake_run_network_scan(
+        output_dir: Path,
+        *,
+        include_explanations: bool,
+    ) -> NetworkScanSummary:
         assert output_dir == tmp_path
+        assert include_explanations is False
         return NetworkScanSummary(
             connections_count=3,
             security_events_count=3,
@@ -271,7 +376,7 @@ def test_scan_network_command_displays_safe_no_alert_message(
 
     monkeypatch.setattr(
         "sentinellite.main.run_network_scan",
-        lambda output_dir: NetworkScanSummary(
+        lambda output_dir, **_kwargs: NetworkScanSummary(
             connections_count=1,
             security_events_count=1,
             detection_matches_count=0,
@@ -302,9 +407,12 @@ def test_scan_files_command_displays_summary_and_alerts(
     def fake_run_file_integrity_scan(
         paths: list[Path],
         output_dir: Path,
+        *,
+        include_explanations: bool,
     ) -> FileIntegrityScanSummary:
         assert paths == selected_paths
         assert output_dir == tmp_path
+        assert include_explanations is False
         return FileIntegrityScanSummary(
             files_checked_count=2,
             security_events_count=2,
@@ -365,9 +473,12 @@ def test_scan_files_command_displays_safe_no_alert_message(
     def fake_run_file_integrity_scan(
         paths: list[Path],
         output_dir: Path,
+        *,
+        include_explanations: bool,
     ) -> FileIntegrityScanSummary:
         assert paths == [selected_path]
         assert output_dir == tmp_path
+        assert include_explanations is False
         return FileIntegrityScanSummary(
             files_checked_count=1,
             security_events_count=1,
