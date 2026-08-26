@@ -32,9 +32,9 @@ AI-assisted explanation is still planned for the future and is not implemented i
 - macOS development validation: passed for CLI status, authentication scanning, process observation, network observation, selected-file observation, baseline creation, and baseline scanning
 - Authentication smoke output confirmed deterministic explanation panels
 - JSON report compatibility confirmed by tests
-- Ubuntu ARM64 validation for the `v0.3.0-alpha` explanation milestone: pending
+- Ubuntu ARM64 validation for the `v0.3.0-alpha` explanation milestone: passed
 
-The earlier baseline-backed file integrity milestone was validated on Ubuntu ARM64, but the new explanation display still requires a dedicated Linux validation pass before release.
+The `v0.3.0-alpha` explanation milestone was validated successfully on an Ubuntu ARM64 VM at commit `ae67254 Document deterministic alert explanations`. Ruff passed, Pytest passed with 288 tests, the CLI displayed `SentinelLite AI v0.3.0-alpha`, authentication scan explanations were displayed, and a changed-file baseline demonstration generated `FIM-004 File Changed Compared With Baseline` with deterministic explanation output.
 
 ## Safety Scope
 
