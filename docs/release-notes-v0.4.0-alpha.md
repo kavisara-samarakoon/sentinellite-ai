@@ -61,7 +61,7 @@ Without `--include-explanations`, alert dictionaries remain unchanged. With the 
 - No dashboard
 - Explanation export requires an explicit CLI flag
 - Real AI-assisted or LLM-based explanation is not implemented
-- Ubuntu ARM64 validation for this milestone is pending
+- Ubuntu ARM64 validation for this milestone passed
 
 ## Author
 
