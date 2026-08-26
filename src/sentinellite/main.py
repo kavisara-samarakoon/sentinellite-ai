@@ -10,6 +10,7 @@ from rich.table import Table
 from sentinellite.collectors.system import SystemInfo, collect_system_info
 from sentinellite.config import SentinelLiteConfig, default_config, write_default_config
 from sentinellite.config.loader import ConfigError, load_config
+from sentinellite.detection.rules import DetectionRule, active_rules_from_disabled_ids
 from sentinellite.explanations.cli import build_explanation_panels
 from sentinellite.explanations.evidence import build_alert_evidence_summary
 from sentinellite.explanations.generator import generate_alert_explanation
@@ -61,14 +62,19 @@ def _show_alert_explanations(alerts: Iterable[object]) -> None:
         console.print(panel)
 
 
+def _selected_config(ctx: typer.Context) -> SentinelLiteConfig:
+    config = ctx.obj
+    if not isinstance(config, SentinelLiteConfig):
+        return default_config()
+    return config
+
+
 def _reporting_options(
     ctx: typer.Context,
     output_dir: Path | None,
     include_explanations: bool | None,
 ) -> tuple[Path, bool]:
-    config = ctx.obj
-    if not isinstance(config, SentinelLiteConfig):
-        config = default_config()
+    config = _selected_config(ctx)
 
     effective_output_dir = (
         output_dir if output_dir is not None else config.reporting.output_dir
@@ -79,6 +85,13 @@ def _reporting_options(
         else config.reporting.include_explanations
     )
     return effective_output_dir, effective_include_explanations
+
+
+def _active_rules(ctx: typer.Context) -> list[DetectionRule] | None:
+    disabled_ids = _selected_config(ctx).rules.disabled_ids
+    if not disabled_ids:
+        return None
+    return active_rules_from_disabled_ids(disabled_ids)
 
 
 def show_banner(config: dict[str, Any]) -> None:
@@ -270,11 +283,13 @@ def scan_auth_command(
         output_dir,
         include_explanations,
     )
+    rules = _active_rules(ctx)
     try:
         summary, scored_alerts = run_auth_scan(
             log_path=log_path,
             output_dir=effective_output_dir,
             include_explanations=effective_include_explanations,
+            rules=rules,
         )
     except FileNotFoundError as error:
         console.print(f"[red][!] {error}[/red]")
@@ -335,9 +350,11 @@ def scan_process_command(
         output_dir,
         include_explanations,
     )
+    rules = _active_rules(ctx)
     summary = run_process_scan(
         output_dir=effective_output_dir,
         include_explanations=effective_include_explanations,
+        rules=rules,
     )
 
     console.print(Panel.fit("Process Scan Complete", title="SentinelLite AI", border_style="green"))
@@ -399,9 +416,11 @@ def scan_network_command(
         output_dir,
         include_explanations,
     )
+    rules = _active_rules(ctx)
     summary = run_network_scan(
         output_dir=effective_output_dir,
         include_explanations=effective_include_explanations,
+        rules=rules,
     )
 
     console.print(Panel.fit("Network Scan Complete", title="SentinelLite AI", border_style="green"))
@@ -467,10 +486,12 @@ def scan_files_command(
         output_dir,
         include_explanations,
     )
+    rules = _active_rules(ctx)
     summary = run_file_integrity_scan(
         paths=paths,
         output_dir=effective_output_dir,
         include_explanations=effective_include_explanations,
+        rules=rules,
     )
 
     console.print(
@@ -595,11 +616,13 @@ def scan_files_baseline_command(
         output_dir,
         include_explanations,
     )
+    rules = _active_rules(ctx)
     try:
         summary = run_file_integrity_baseline_scan(
             baseline_path=baseline_path,
             output_dir=effective_output_dir,
             include_explanations=effective_include_explanations,
+            rules=rules,
         )
     except FileNotFoundError as error:
         console.print(f"[red][!] {error}[/red]")

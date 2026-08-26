@@ -7,6 +7,7 @@ from typer.main import get_command
 from typer.testing import CliRunner
 
 from sentinellite.config import default_config, load_config
+from sentinellite.detection.rules import DEFAULT_RULES, DetectionRule
 from sentinellite.main import app
 from sentinellite.pipeline.auth_scan import AuthScanSummary
 from sentinellite.pipeline.file_integrity_baseline_scan import (
@@ -32,7 +33,9 @@ def write_reporting_config(
     *,
     output_dir: str = "configured-reports",
     include_explanations: bool = False,
+    disabled_ids: tuple[str, ...] = (),
 ) -> Path:
+    disabled_ids_toml = ", ".join(f'"{rule_id}"' for rule_id in disabled_ids)
     config_path = tmp_path / "sentinellite.toml"
     config_path.write_text(
         "\n".join(
@@ -42,6 +45,9 @@ def write_reporting_config(
                 "[reporting]",
                 f'output_dir = "{output_dir}"',
                 f"include_explanations = {str(include_explanations).lower()}",
+                "",
+                "[rules]",
+                f"disabled_ids = [{disabled_ids_toml}]",
                 "",
             ]
         ),
@@ -174,10 +180,12 @@ def test_scan_auth_command_displays_deterministic_explanation(
         output_dir: Path,
         *,
         include_explanations: bool,
+        rules: list[DetectionRule] | None,
     ) -> tuple[AuthScanSummary, list[ScoredAlert]]:
         assert log_path == tmp_path / "auth.log"
         assert output_dir == tmp_path
         assert include_explanations is False
+        assert rules is None
         return (
             AuthScanSummary(
                 log_path=str(log_path),
@@ -306,10 +314,12 @@ def test_scan_auth_without_config_uses_builtin_reporting_defaults(
         output_dir: Path,
         *,
         include_explanations: bool,
+        rules: list[DetectionRule] | None,
     ) -> tuple[AuthScanSummary, list[ScoredAlert]]:
         captured.update(
             output_dir=output_dir,
             include_explanations=include_explanations,
+            rules=rules,
         )
         return (
             AuthScanSummary(
@@ -331,6 +341,7 @@ def test_scan_auth_without_config_uses_builtin_reporting_defaults(
     assert captured == {
         "output_dir": Path("reports"),
         "include_explanations": False,
+        "rules": None,
     }
 
 
@@ -347,7 +358,7 @@ def test_scan_auth_without_config_uses_builtin_reporting_defaults(
         ),
     ],
 )
-def test_json_scan_commands_apply_only_configured_reporting_settings(
+def test_json_scan_commands_apply_reporting_and_rule_settings_without_module_gating(
     command_args: list[str],
     pipeline_name: str,
     monkeypatch: pytest.MonkeyPatch,
@@ -368,7 +379,7 @@ network = false
 file_integrity = false
 
 [rules]
-disabled_ids = ["AUTH-001"]
+disabled_ids = ["AUTH-001", "PROC-001", "NET-001", "FIM-001", "FIM-004"]
 """,
         encoding="utf-8",
     )
@@ -415,7 +426,200 @@ disabled_ids = ["AUTH-001"]
     assert result.exit_code == 0
     assert captured["output_dir"] == tmp_path / "configured-reports"
     assert captured["include_explanations"] is True
-    assert "rules" not in captured
+    disabled_ids = {"AUTH-001", "PROC-001", "NET-001", "FIM-001", "FIM-004"}
+    rules = captured["rules"]
+    assert isinstance(rules, list)
+    assert [rule.rule_id for rule in rules] == [
+        rule.rule_id for rule in DEFAULT_RULES if rule.rule_id not in disabled_ids
+    ]
+
+
+def test_config_disabling_auth_rule_suppresses_only_failed_login_alerts(
+    tmp_path: Path,
+) -> None:
+    config_path = write_reporting_config(
+        tmp_path,
+        disabled_ids=("AUTH-001",),
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "--config",
+            str(config_path),
+            "scan-auth",
+            "examples/auth_logs/sample_auth.log",
+        ],
+    )
+
+    assert result.exit_code == 0
+    report_path = next((tmp_path / "configured-reports").glob("*.json"))
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert set(report) == REPORT_KEYS
+    assert [alert["rule_id"] for alert in report["alerts"]] == [
+        "AUTH-002",
+        "AUTH-003",
+    ]
+    assert "AUTH-001" not in result.stdout
+
+
+def test_disabled_auth_rule_has_no_json_or_terminal_explanation(
+    tmp_path: Path,
+) -> None:
+    config_path = write_reporting_config(
+        tmp_path,
+        include_explanations=True,
+        disabled_ids=("AUTH-001",),
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "--config",
+            str(config_path),
+            "scan-auth",
+            "examples/auth_logs/sample_auth.log",
+        ],
+    )
+
+    assert result.exit_code == 0
+    report_path = next((tmp_path / "configured-reports").glob("*.json"))
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert [alert["rule_id"] for alert in report["alerts"]] == [
+        "AUTH-002",
+        "AUTH-003",
+    ]
+    assert [alert["explanation"]["rule_id"] for alert in report["alerts"]] == [
+        "AUTH-002",
+        "AUTH-003",
+    ]
+    assert "AUTH-001" not in json.dumps(report["alerts"])
+    assert "AUTH-001" not in result.stdout
+    assert "Deterministic Alert Explanations" in result.stdout
+
+
+def test_config_with_no_disabled_rules_preserves_default_auth_alerts(
+    tmp_path: Path,
+) -> None:
+    config_path = write_reporting_config(tmp_path, disabled_ids=())
+
+    result = runner.invoke(
+        app,
+        [
+            "--config",
+            str(config_path),
+            "scan-auth",
+            "examples/auth_logs/sample_auth.log",
+        ],
+    )
+
+    assert result.exit_code == 0
+    report_path = next((tmp_path / "configured-reports").glob("*.json"))
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert [alert["rule_id"] for alert in report["alerts"]] == [
+        "AUTH-001",
+        "AUTH-001",
+        "AUTH-002",
+        "AUTH-003",
+    ]
+
+
+def test_config_disabling_file_integrity_rule_flows_through_scan_files(
+    tmp_path: Path,
+) -> None:
+    missing_path = tmp_path / "missing.txt"
+    config_path = write_reporting_config(
+        tmp_path,
+        disabled_ids=("FIM-001",),
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "--config",
+            str(config_path),
+            "scan-files",
+            str(missing_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    report_path = next((tmp_path / "configured-reports").glob("*.json"))
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert [alert["rule_id"] for alert in report["alerts"]] == ["FIM-002"]
+    assert "FIM-001" not in result.stdout
+
+
+def test_config_disabling_changed_file_rule_flows_through_baseline_scan(
+    tmp_path: Path,
+) -> None:
+    monitored_path = tmp_path / "monitored.txt"
+    monitored_path.write_text("original", encoding="utf-8")
+    baseline_path = tmp_path / "baseline.json"
+    baseline_result = runner.invoke(
+        app,
+        [
+            "baseline-files",
+            str(monitored_path),
+            "--baseline-path",
+            str(baseline_path),
+        ],
+    )
+    assert baseline_result.exit_code == 0
+    monitored_path.write_text("changed", encoding="utf-8")
+    config_path = write_reporting_config(
+        tmp_path,
+        disabled_ids=("FIM-004",),
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "--config",
+            str(config_path),
+            "scan-files-baseline",
+            "--baseline-path",
+            str(baseline_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    report_path = next((tmp_path / "configured-reports").glob("*.json"))
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert set(report) == REPORT_KEYS
+    assert report["alerts"] == []
+    assert "FIM-004" not in result.stdout
+    assert "No baseline file integrity alerts generated." in result.stdout
+
+
+def test_invalid_disabled_rule_fails_before_scan_pipeline(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    config_path = write_reporting_config(
+        tmp_path,
+        disabled_ids=("AUTH-999",),
+    )
+    pipeline_called = False
+
+    def fake_run_auth_scan(**_kwargs: object) -> None:
+        nonlocal pipeline_called
+        pipeline_called = True
+
+    monkeypatch.setattr("sentinellite.main.run_auth_scan", fake_run_auth_scan)
+
+    result = runner.invoke(
+        app,
+        ["--config", str(config_path), "scan-auth", "auth.log"],
+    )
+
+    assert result.exit_code != 0
+    assert "Failed to load configuration" in result.stdout
+    assert "Unknown disabled rule ID" in result.stdout
+    assert "AUTH-999" in result.stdout
+    assert "Traceback" not in result.stdout
+    assert pipeline_called is False
+    assert not (tmp_path / "configured-reports").exists()
 
 
 def test_config_output_dir_and_false_explanations_write_legacy_json(
@@ -592,10 +796,12 @@ def test_config_file_in_current_directory_is_not_auto_discovered(
         output_dir: Path,
         *,
         include_explanations: bool,
+        rules: list[DetectionRule] | None,
     ) -> tuple[AuthScanSummary, list[ScoredAlert]]:
         captured.update(
             output_dir=output_dir,
             include_explanations=include_explanations,
+            rules=rules,
         )
         return (
             AuthScanSummary(
@@ -617,6 +823,7 @@ def test_config_file_in_current_directory_is_not_auto_discovered(
     assert captured == {
         "output_dir": Path("reports"),
         "include_explanations": False,
+        "rules": None,
     }
 
 
@@ -697,9 +904,11 @@ def test_scan_process_command_displays_summary_and_alerts(
         output_dir: Path,
         *,
         include_explanations: bool,
+        rules: list[DetectionRule] | None,
     ) -> ProcessScanSummary:
         assert output_dir == tmp_path
         assert include_explanations is False
+        assert rules is None
         return ProcessScanSummary(
             processes_count=3,
             security_events_count=3,
@@ -784,9 +993,11 @@ def test_scan_network_command_displays_summary_and_alerts(
         output_dir: Path,
         *,
         include_explanations: bool,
+        rules: list[DetectionRule] | None,
     ) -> NetworkScanSummary:
         assert output_dir == tmp_path
         assert include_explanations is False
+        assert rules is None
         return NetworkScanSummary(
             connections_count=3,
             security_events_count=3,
@@ -876,10 +1087,12 @@ def test_scan_files_command_displays_summary_and_alerts(
         output_dir: Path,
         *,
         include_explanations: bool,
+        rules: list[DetectionRule] | None,
     ) -> FileIntegrityScanSummary:
         assert paths == selected_paths
         assert output_dir == tmp_path
         assert include_explanations is False
+        assert rules is None
         return FileIntegrityScanSummary(
             files_checked_count=2,
             security_events_count=2,
@@ -942,10 +1155,12 @@ def test_scan_files_command_displays_safe_no_alert_message(
         output_dir: Path,
         *,
         include_explanations: bool,
+        rules: list[DetectionRule] | None,
     ) -> FileIntegrityScanSummary:
         assert paths == [selected_path]
         assert output_dir == tmp_path
         assert include_explanations is False
+        assert rules is None
         return FileIntegrityScanSummary(
             files_checked_count=1,
             security_events_count=1,
