@@ -109,6 +109,13 @@ def test_scan_auth_command_keeps_no_alert_output_without_explanations(
     assert "Alert Explanation" not in result.stdout
 
 
+def test_scan_auth_command_has_no_json_explanation_flag_yet() -> None:
+    result = runner.invoke(app, ["scan-auth", "--help"])
+
+    assert result.exit_code == 0
+    assert "--include-explanations" not in result.stdout
+
+
 def test_default_status_describes_implemented_and_planned_modules() -> None:
     result = runner.invoke(app)
 

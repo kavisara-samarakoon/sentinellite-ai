@@ -10,6 +10,7 @@ from rich.table import Table
 from sentinellite.collectors.system import SystemInfo, collect_system_info
 from sentinellite.config.loader import ConfigError, load_config
 from sentinellite.explanations.cli import build_explanation_panels
+from sentinellite.explanations.evidence import build_alert_evidence_summary
 from sentinellite.explanations.generator import generate_alert_explanation
 from sentinellite.pipeline.auth_scan import run_auth_scan
 from sentinellite.pipeline.file_integrity_baseline_scan import (
@@ -36,31 +37,6 @@ def _alert_value(alert: object, field_name: str) -> object | None:
     return getattr(alert, field_name, None)
 
 
-def _build_alert_evidence_summary(alert: object) -> dict[str, object]:
-    evidence_summary: dict[str, object] = {}
-
-    for output_name, field_name in (
-        ("rule_id", "rule_id"),
-        ("severity", "severity"),
-        ("score", "risk_score"),
-        ("event_type", "event_type"),
-        ("source", "source"),
-        ("message", "message"),
-    ):
-        value = _alert_value(alert, field_name)
-        if value is not None:
-            evidence_summary[output_name] = value
-
-    alert_evidence = _alert_value(alert, "evidence")
-    if isinstance(alert_evidence, Mapping):
-        for field_name in ("path", "status"):
-            value = alert_evidence.get(field_name)
-            if value is not None:
-                evidence_summary[field_name] = value
-
-    return evidence_summary
-
-
 def _show_alert_explanations(alerts: Iterable[object]) -> None:
     explanations = []
 
@@ -71,7 +47,7 @@ def _show_alert_explanations(alerts: Iterable[object]) -> None:
         explanations.append(
             generate_alert_explanation(
                 rule_id,
-                _build_alert_evidence_summary(alert),
+                build_alert_evidence_summary(alert),
             )
         )
 
