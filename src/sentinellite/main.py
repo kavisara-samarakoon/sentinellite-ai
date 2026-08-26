@@ -8,6 +8,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from sentinellite.collectors.system import SystemInfo, collect_system_info
+from sentinellite.config import write_default_config
 from sentinellite.config.loader import ConfigError, load_config
 from sentinellite.explanations.cli import build_explanation_panels
 from sentinellite.explanations.evidence import build_alert_evidence_summary
@@ -186,6 +187,30 @@ def show_status() -> None:
 def main(ctx: typer.Context) -> None:
     if ctx.invoked_subcommand is None:
         show_status()
+
+
+@app.command("config-init")
+def config_init_command(
+    path: Annotated[
+        Path,
+        typer.Option(
+            "--path",
+            help="Path for the new SentinelLite TOML configuration file.",
+        ),
+    ] = Path("sentinellite.toml"),
+) -> None:
+    """Create a default SentinelLite TOML configuration file."""
+    try:
+        created_path = write_default_config(path)
+    except (ConfigError, OSError) as error:
+        console.print(f"[red][!] Configuration error: {error}[/red]")
+        raise typer.Exit(code=1) from error
+
+    console.print(f"[green][+] Created default config:[/green] {created_path}")
+    console.print(
+        "Example: python -m sentinellite "
+        f"--config {created_path} scan-auth examples/auth_logs/sample_auth.log"
+    )
 
 
 @app.command("scan-auth")

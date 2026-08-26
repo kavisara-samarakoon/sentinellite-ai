@@ -1,10 +1,12 @@
 import json
+import tomllib
 from pathlib import Path
 
 import pytest
 from typer.main import get_command
 from typer.testing import CliRunner
 
+from sentinellite.config import default_config, load_config
 from sentinellite.main import app
 from sentinellite.pipeline.auth_scan import AuthScanSummary
 from sentinellite.pipeline.file_integrity_scan import FileIntegrityScanSummary
@@ -20,6 +22,101 @@ REPORT_KEYS = {
     "alert_count",
     "alerts",
 }
+
+
+def test_config_init_creates_valid_default_toml(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    result = runner.invoke(app, ["config-init"])
+
+    config_path = tmp_path / "sentinellite.toml"
+    assert result.exit_code == 0
+    assert config_path.exists()
+    assert tomllib.loads(config_path.read_text(encoding="utf-8")) == {
+        "config_version": 1,
+        "reporting": {
+            "output_dir": "reports",
+            "include_explanations": False,
+        },
+        "modules": {
+            "authentication": True,
+            "process": True,
+            "network": True,
+            "file_integrity": True,
+        },
+        "rules": {"disabled_ids": []},
+    }
+    assert load_config(Path("sentinellite.toml")) == default_config()
+    assert "Created default config" in result.stdout
+    assert "sentinellite.toml" in result.stdout
+    assert "--config" in result.stdout
+    assert "scan-auth" in result.stdout
+    normalized_output = result.stdout.lower()
+    assert "--ai" not in normalized_output
+    assert "--llm" not in normalized_output
+
+
+def test_config_init_refuses_overwrite_without_modifying_existing_file(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    config_path = tmp_path / "sentinellite.toml"
+    original_content = "existing user configuration\n"
+    config_path.write_text(original_content, encoding="utf-8")
+
+    result = runner.invoke(app, ["config-init"])
+
+    assert result.exit_code != 0
+    assert "Configuration error" in result.stdout
+    assert "already exists" in result.stdout
+    assert "Traceback" not in result.stdout
+    assert config_path.read_text(encoding="utf-8") == original_content
+
+
+def test_config_init_path_option_creates_selected_file(tmp_path: Path) -> None:
+    config_dir = tmp_path / "configs"
+    config_dir.mkdir()
+    config_path = config_dir / "custom.toml"
+
+    result = runner.invoke(app, ["config-init", "--path", str(config_path)])
+
+    assert result.exit_code == 0
+    assert config_path.exists()
+    assert tomllib.loads(config_path.read_text(encoding="utf-8"))["config_version"] == 1
+    assert str(config_path) in result.stdout.replace("\n", "")
+
+
+def test_config_init_missing_parent_fails_cleanly(tmp_path: Path) -> None:
+    config_path = tmp_path / "missing" / "sentinellite.toml"
+
+    result = runner.invoke(app, ["config-init", "--path", str(config_path)])
+
+    assert result.exit_code != 0
+    assert "Configuration error" in result.stdout
+    assert "parent directory does not exist" in result.stdout
+    assert "Traceback" not in result.stdout
+    assert not config_path.parent.exists()
+    assert not config_path.exists()
+
+
+def test_config_init_handles_writer_oserror_cleanly(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def raise_oserror(_path: Path) -> Path:
+        raise OSError("simulated write failure")
+
+    monkeypatch.setattr("sentinellite.main.write_default_config", raise_oserror)
+
+    result = runner.invoke(app, ["config-init"])
+
+    assert result.exit_code != 0
+    assert "Configuration error" in result.stdout
+    assert "simulated write failure" in result.stdout
+    assert "Traceback" not in result.stdout
 
 
 def test_scan_auth_command_displays_deterministic_explanation(
