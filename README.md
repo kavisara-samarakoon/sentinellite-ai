@@ -2,13 +2,13 @@
 
 SentinelLite AI is a lightweight Linux endpoint detection and monitoring agent with planned AI-assisted alert analysis.
 
-The project starts as a Python CLI tool focused on defensive Linux security monitoring. It collects security-relevant events, applies transparent detection rules, calculates risk levels, generates JSON reports, and later provides human-readable defensive explanations.
+The project is a Python CLI tool focused on defensive Linux security monitoring. It collects security-relevant events, applies transparent detection rules, calculates risk levels, generates JSON reports, and presents local, deterministic guidance for investigating scored alerts. AI-assisted explanation remains a future capability and is not implemented.
 
 ## Current Status
 
-Version: `v0.1.0`
+Current milestone: `v0.3.0-alpha` (in development; not released)
 
-Current prototype status:
+Current milestone status:
 
 - CLI startup working
 - Configuration loader working
@@ -41,7 +41,11 @@ Current prototype status:
 - Baseline-backed file comparison, event normalization, detection, and risk scoring implemented
 - File integrity baseline creation and scan pipelines implemented
 - `baseline-files` and `scan-files-baseline` CLI commands working
-- 207 automated tests passing
+- Deterministic explanation model and templates implemented for AUTH, PROC, NET, and FIM rules
+- Local explanation generation and Rich terminal panels implemented
+- Deterministic explanations displayed by scan commands when scored alerts exist
+- JSON alert report schema remains unchanged for the `v0.3.0-alpha` milestone
+- 288 automated tests passing
 
 Baseline-backed file integrity monitoring is implemented and has been validated on Ubuntu ARM64. See the [Linux ARM64 validation notes](docs/linux-validation.md).
 
@@ -50,6 +54,8 @@ See [the demo guide](docs/demo-guide.md) for a suggested project demonstration f
 See the [v0.1.0-alpha release notes](docs/release-notes-v0.1.0-alpha.md).
 
 See the [v0.2.0-alpha release notes](docs/release-notes-v0.2.0-alpha.md) for the baseline-backed file integrity milestone.
+
+See the [v0.3.0-alpha release notes](docs/release-notes-v0.3.0-alpha.md) for the current deterministic alert explanation milestone.
 
 ## Security Scope
 
@@ -67,6 +73,7 @@ It is intended for:
 - defensive alerting
 - SOC-style investigation practice
 - structured JSON reporting
+- local, deterministic, rule-based investigation guidance
 - planned AI-assisted defensive explanation
 
 It is not intended for:
@@ -118,11 +125,14 @@ It is not intended for:
 - Risk scoring
 - JSON alert report generation
 - Terminal-based scan summary
+- Deterministic alert explanation model and rule templates
+- Local explanation generation with generic fallback guidance
+- Rich terminal explanation panels for scored alerts
 
 ## Planned Features
 
 - Improved detection rules
-- AI-assisted alert explanation
+- AI-assisted alert explanation beyond the current deterministic template layer
 - Additional Linux environment validation
 - ARM-SecNet integration testing
 - Local dashboard in a later version
@@ -180,6 +190,8 @@ Scan a sample authentication log file:
 python -m sentinellite scan-auth examples/auth_logs/sample_auth.log
 ```
 
+When the scan produces scored alerts, the existing alert table is followed by a `Deterministic Alert Explanations` section. Its local rule templates summarize why each rule matched, list possible causes, and recommend investigation steps. No explanation section is printed when there are no scored alerts.
+
 Scan the current running process list:
 
 ```bash
@@ -235,6 +247,8 @@ python -m sentinellite scan-files-baseline --baseline-path file-integrity-baseli
 ```
 
 The baseline workflow starts by recording a trusted state for selected paths. A later scan observes those same paths and compares their current state with the saved baseline. Changed, missing, appeared, type-changed, and observation-error states become investigation signals. Unchanged files still produce comparison events but do not create alerts. The `not_in_baseline` comparison status is retained as context and is not currently an alert.
+
+If a monitored file changes, the `FIM-004` alert is followed by a deterministic explanation panel with baseline-focused review guidance. The panel uses only the known rule template and evidence already present in the alert.
 
 For example, process scan output can also be directed to `reports/`:
 
@@ -360,11 +374,19 @@ FIM-007   MEDIUM (60)  File Type Changed Compared With Baseline
 FIM-008   LOW (35)     File Integrity Baseline Comparison Error
 ```
 
+## Deterministic Alert Explanations
+
+When a scan produces scored alerts, the CLI builds an explanation from a local template keyed by the alert's rule ID. Each panel shows the rule, a plain-language summary, why the rule matched, possible causes, recommended investigation actions, confidence, and a small summary of evidence already present in the alert. Unknown rule IDs receive cautious generic guidance without invented rule-specific meaning.
+
+This layer is deterministic and rule-based. It does not call an AI model, LLM, network API, or external explanation service. The guidance does not classify files or processes as malware, does not automatically claim a system is compromised, and does not perform response actions. AI-assisted explanation remains planned for future work.
+
 ## Reports
 
 SentinelLite AI writes alert reports to the `reports/` directory.
 
 Reports are generated as JSON files. Local reports are ignored by Git to avoid committing machine-specific scan output.
+
+The `v0.3.0-alpha` milestone adds explanations to terminal output only. JSON reports retain their existing schema and do not include explanation objects yet.
 
 Example report structure:
 
@@ -385,7 +407,7 @@ Example report structure:
 
 ## Testing
 
-The current test suite contains 207 tests covering collectors, baseline models and persistence, normalization, detection, scoring, reporting, pipelines, and CLI behavior.
+The current test suite contains 288 tests covering collectors, baseline models and persistence, normalization, detection, scoring, reporting, deterministic explanations, pipelines, and CLI behavior.
 
 Run all tests:
 
@@ -481,7 +503,7 @@ File integrity rules report current observation conditions such as an absent pat
 - Linux ARM64 testing
 - Better CLI commands
 - Baseline-backed file integrity creation, comparison, detection, reporting, and CLI workflow
-- AI-assisted alert explanation
+- Deterministic, local alert explanations in CLI output
 - Screenshots and demo evidence
 
 ### Version 1.0

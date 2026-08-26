@@ -1,20 +1,119 @@
+import json
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
 from sentinellite.main import app
+from sentinellite.pipeline.auth_scan import AuthScanSummary
 from sentinellite.pipeline.file_integrity_scan import FileIntegrityScanSummary
 from sentinellite.pipeline.network_scan import NetworkScanSummary
 from sentinellite.pipeline.process_scan import ProcessScanSummary
+from sentinellite.scoring.risk import ScoredAlert
 
 runner = CliRunner()
+
+
+def test_scan_auth_command_displays_deterministic_explanation(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    log_path = tmp_path / "auth.log"
+    report_path = tmp_path / "auth-alerts.json"
+    scored_alert = ScoredAlert(
+        alert_id="alert-1",
+        rule_id="AUTH-001",
+        rule_name="Failed SSH Login",
+        category="authentication",
+        severity="medium",
+        base_score=50,
+        risk_score=50,
+        risk_level="medium",
+        event_id="event-1",
+        event_type="ssh_failed_login",
+        source="auth_log",
+        message="Failed SSH login for root from 192.0.2.10",
+        description="A failed SSH login attempt was detected.",
+        recommendation="Review the authentication context.",
+        evidence={"username": "root", "source_address": "192.0.2.10"},
+    )
+
+    def fake_run_auth_scan(
+        log_path: Path,
+        output_dir: Path,
+    ) -> tuple[AuthScanSummary, list[ScoredAlert]]:
+        assert log_path == tmp_path / "auth.log"
+        assert output_dir == tmp_path
+        return (
+            AuthScanSummary(
+                log_path=str(log_path),
+                auth_events_count=1,
+                security_events_count=1,
+                detection_matches_count=1,
+                scored_alerts_count=1,
+                report_path=str(report_path),
+            ),
+            [scored_alert],
+        )
+
+    monkeypatch.setattr("sentinellite.main.run_auth_scan", fake_run_auth_scan)
+
+    result = runner.invoke(
+        app,
+        ["scan-auth", str(log_path), "--output-dir", str(tmp_path)],
+    )
+
+    assert result.exit_code == 0
+    assert "Generated Alerts" in result.stdout
+    assert "Deterministic Alert Explanations" in result.stdout
+    assert "Alert Explanation" in result.stdout
+    assert "Failed SSH Login Attempt" in result.stdout
+    assert "AUTH-001" in result.stdout
+    assert "ssh_failed_login" in result.stdout
+    normalized_output = result.stdout.lower()
+    assert "ai detected" not in normalized_output
+    assert "malware" not in normalized_output
+    assert "is compromised" not in normalized_output
+    assert "confirmed compromise" not in normalized_output
+
+
+def test_scan_auth_command_keeps_no_alert_output_without_explanations(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    log_path = tmp_path / "auth.log"
+
+    monkeypatch.setattr(
+        "sentinellite.main.run_auth_scan",
+        lambda log_path, output_dir: (
+            AuthScanSummary(
+                log_path=str(log_path),
+                auth_events_count=0,
+                security_events_count=0,
+                detection_matches_count=0,
+                scored_alerts_count=0,
+                report_path=str(output_dir / "auth-alerts.json"),
+            ),
+            [],
+        ),
+    )
+
+    result = runner.invoke(
+        app,
+        ["scan-auth", str(log_path), "--output-dir", str(tmp_path)],
+    )
+
+    assert result.exit_code == 0
+    assert "No alerts generated." in result.stdout
+    assert "Deterministic Alert Explanations" not in result.stdout
+    assert "Alert Explanation" not in result.stdout
 
 
 def test_default_status_describes_implemented_and_planned_modules() -> None:
     result = runner.invoke(app)
 
     assert result.exit_code == 0
+    assert "SentinelLite AI v0.3.0-alpha" in result.stdout
     assert "│ Authentication Monitor  │ Enabled │" in result.stdout
     assert "│ Process Monitor         │ Enabled │" in result.stdout
     assert "│ Network Monitor         │ Enabled │" in result.stdout
@@ -75,6 +174,8 @@ def test_scan_process_command_displays_summary_and_alerts(
     assert "PROC-001" in result.stdout
     assert "MEDIUM (60)" in result.stdout
     assert "Observed process 'worker' with PID 200" in result.stdout
+    assert "Deterministic Alert Explanations" in result.stdout
+    assert "Process Running From Temporary Path" in result.stdout
 
 
 def test_scan_process_command_displays_safe_no_alert_message(
@@ -102,6 +203,8 @@ def test_scan_process_command_displays_safe_no_alert_message(
     assert result.exit_code == 0
     assert "Process Scan Complete" in result.stdout
     assert "No process alerts generated." in result.stdout
+    assert "Deterministic Alert Explanations" not in result.stdout
+    assert "Alert Explanation" not in result.stdout
 
 
 def test_scan_network_command_displays_summary_and_alerts(
@@ -156,6 +259,8 @@ def test_scan_network_command_displays_summary_and_alerts(
     assert "NET-001" in result.stdout
     assert "MEDIUM (55)" in result.stdout
     assert "Observed network connection at 127.0.0.1:8080" in result.stdout
+    assert "Deterministic Alert Explanations" in result.stdout
+    assert "Listening Service on Unusual Port" in result.stdout
 
 
 def test_scan_network_command_displays_safe_no_alert_message(
@@ -183,6 +288,8 @@ def test_scan_network_command_displays_safe_no_alert_message(
     assert result.exit_code == 0
     assert "Network Scan Complete" in result.stdout
     assert "No network alerts generated." in result.stdout
+    assert "Deterministic Alert Explanations" not in result.stdout
+    assert "Alert Explanation" not in result.stdout
 
 
 def test_scan_files_command_displays_summary_and_alerts(
@@ -244,6 +351,8 @@ def test_scan_files_command_displays_summary_and_alerts(
     assert "FIM-001" in result.stdout
     assert "MEDIUM (60)" in result.stdout
     assert "Observed missing file at /selected/missing.txt" in result.stdout
+    assert "Deterministic Alert Explanations" in result.stdout
+    assert "Monitored File Is Missing" in result.stdout
 
 
 def test_scan_files_command_displays_safe_no_alert_message(
@@ -285,6 +394,8 @@ def test_scan_files_command_displays_safe_no_alert_message(
     assert "Scored alerts" in result.stdout
     assert "JSON report" in result.stdout
     assert "No file integrity alerts generated." in result.stdout
+    assert "Deterministic Alert Explanations" not in result.stdout
+    assert "Alert Explanation" not in result.stdout
 
 
 def test_scan_files_command_requires_explicit_path() -> None:
@@ -366,6 +477,8 @@ def test_scan_files_baseline_unchanged_writes_report_and_displays_summary(
     assert "Scored alerts" in result.stdout
     assert "JSON report path" in result.stdout
     assert "No baseline file integrity alerts generated." in result.stdout
+    assert "Deterministic Alert Explanations" not in result.stdout
+    assert "Alert Explanation" not in result.stdout
 
 
 def test_scan_files_baseline_displays_alert_after_file_changes(tmp_path: Path) -> None:
@@ -400,6 +513,23 @@ def test_scan_files_baseline_displays_alert_after_file_changes(tmp_path: Path) -
     assert "FIM-004" in result.stdout
     assert "MEDIUM (70)" in result.stdout
     assert "File changed compared with baseline" in result.stdout
+    assert "Deterministic Alert Explanations" in result.stdout
+    assert "File Changed Compared With Baseline" in result.stdout
+    assert "Evidence summary" in result.stdout
+    assert "status" in result.stdout
+    assert "changed" in result.stdout
+
+    report_paths = list(output_dir.glob("*.json"))
+    assert len(report_paths) == 1
+    report = json.loads(report_paths[0].read_text(encoding="utf-8"))
+    assert set(report) == {
+        "report_id",
+        "report_type",
+        "generated_at",
+        "alert_count",
+        "alerts",
+    }
+    assert all("explanation" not in alert for alert in report["alerts"])
 
 
 def test_scan_files_baseline_missing_file_fails_cleanly(tmp_path: Path) -> None:
