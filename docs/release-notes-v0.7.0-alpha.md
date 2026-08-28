@@ -28,11 +28,17 @@ This milestone improves Linux authentication log source compatibility while pres
 
 ## Validation
 
-- Automated Ruff, Pytest, CLI, fixture, JSON compatibility, report review, and CI smoke validation is defined.
-- macOS development validation: pending
-- Ubuntu ARM64 validation: pending
-- Real authorized `/var/log/auth.log` validation: pending
-- No Fedora or RHEL runtime validation is claimed yet; the committed RHEL/Fedora-style input is a representative fixture only.
+- GitHub PR CI passed for both `push` and `pull_request` workflows.
+- macOS development validation: passed
+- Ubuntu ARM64 validation: passed on Linux `aarch64` with Python 3.14.4
+- Ruff passed, and Pytest passed with 531 tests.
+- The CLI displayed `SentinelLite AI v0.7.0-alpha`, and `auth-sources list` completed successfully.
+- On the Ubuntu ARM64 VM, source inventory reported `/var/log/auth.log` as available and `/var/log/secure` as missing. This was inventory only; no real `/var/log/auth.log` scan was performed or claimed.
+- Fixture scan validation passed for the representative Ubuntu/Debian-style and RHEL/Fedora-style text logs. Each fixture produced 3 authentication events and 3 alerts.
+- Report review smoke validation passed: `reports list` displayed a generated report as valid, and `reports show` displayed its summary and stored alerts.
+- JSON compatibility validation passed with exactly the five established top-level fields: `report_id`, `report_type`, `generated_at`, `alert_count`, and `alerts`. No top-level `explanations` field was added.
+- The working tree was clean after Ubuntu ARM64 validation.
+- No Fedora or RHEL runtime validation is claimed; the committed RHEL/Fedora-style input is a representative fixture only.
 
 ## Safety Scope
 
@@ -86,7 +92,8 @@ Authentication source family, inventory status, and candidate metadata are not a
 - Journald input is not supported in v0.7.
 - Compressed rotated authentication logs are not supported in v0.7.
 - The parser supports selected traditional failed SSH password, accepted SSH password, and sudo records; it does not claim support for every distribution record.
-- Real authorized `/var/log/auth.log`, Ubuntu ARM64 v0.7, and RHEL/Fedora runtime validation remain pending.
+- A real authorized `/var/log/auth.log` scan was not performed or claimed.
+- Fedora/RHEL runtime validation was not performed or claimed; validation of that log style uses only the representative fixture.
 - There is no database, persistent source index, dashboard, or daemon.
 - Real AI-assisted or LLM-based explanation is not implemented.
 
