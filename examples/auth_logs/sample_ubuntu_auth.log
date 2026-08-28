@@ -1,0 +1,4 @@
+Aug 27 10:15:01 ubuntu-demo sshd[2101]: Failed password for invalid user labadmin from 192.0.2.10 port 41001 ssh2
+Aug 27 10:16:02 ubuntu-demo sshd[2102]: Accepted password for demo-user from 192.0.2.11 port 41002 ssh2
+Aug 27 10:17:03 ubuntu-demo sudo:  demo-user : TTY=pts/0 ; PWD=/home/demo-user ; USER=root ; COMMAND=/usr/bin/id
+Aug 27 10:18:04 ubuntu-demo systemd[1]: Started Daily cleanup of temporary directories.

@@ -1867,6 +1867,96 @@ def test_scan_auth_permission_error_fails_cleanly_without_report(
     assert not report_dir.exists()
 
 
+@pytest.mark.parametrize(
+    ("fixture_path", "output_name"),
+    [
+        (
+            Path("examples/auth_logs/sample_ubuntu_auth.log"),
+            "ubuntu-reports",
+        ),
+        (
+            Path("examples/auth_logs/sample_rhel_secure.log"),
+            "rhel-reports",
+        ),
+    ],
+)
+def test_scan_auth_traditional_linux_fixture_supports_report_review_commands(
+    fixture_path: Path,
+    output_name: str,
+    tmp_path: Path,
+) -> None:
+    report_dir = tmp_path / output_name
+
+    scan_result = runner.invoke(
+        app,
+        ["scan-auth", str(fixture_path), "--output-dir", str(report_dir)],
+        terminal_width=180,
+    )
+
+    report_paths = sorted(report_dir.glob("*.json"))
+    assert scan_result.exit_code == 0
+    assert "Authentication Scan Complete" in scan_result.stdout
+    assert "Auth events found" in scan_result.stdout
+    assert len(report_paths) == 1
+
+    list_result = runner.invoke(
+        app,
+        ["reports", "list", "--report-dir", str(report_dir)],
+        terminal_width=180,
+    )
+
+    assert list_result.exit_code == 0
+    assert "alerts-" in list_result.stdout
+    assert "valid" in list_result.stdout
+
+    show_result = runner.invoke(
+        app,
+        ["reports", "show", str(report_paths[0])],
+        terminal_width=180,
+    )
+
+    assert show_result.exit_code == 0
+    assert "SentinelLite Alert Report Summary" in show_result.stdout
+    assert "Stored Alerts" in show_result.stdout
+    assert "AUTH-001" in show_result.stdout
+    assert "AUTH-002" in show_result.stdout
+    assert "AUTH-003" in show_result.stdout
+
+
+def test_auth_sources_list_does_not_scan_compatibility_fixtures(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    ubuntu_fixture = Path("examples/auth_logs/sample_ubuntu_auth.log").resolve()
+    rhel_fixture = Path("examples/auth_logs/sample_rhel_secure.log").resolve()
+    original_contents = {
+        ubuntu_fixture: ubuntu_fixture.read_bytes(),
+        rhel_fixture: rhel_fixture.read_bytes(),
+    }
+    entries = (
+        AuthLogSourceEntry("debian_ubuntu", ubuntu_fixture, "available", None),
+        AuthLogSourceEntry("rhel_fedora", rhel_fixture, "available", None),
+    )
+    monkeypatch.setattr(
+        "sentinellite.main.discover_auth_log_sources",
+        lambda _candidates: entries,
+    )
+
+    def fail_if_scanned(*_args: object, **_kwargs: object) -> None:
+        pytest.fail("auth-sources list must not scan compatibility fixtures")
+
+    monkeypatch.setattr("sentinellite.main.run_auth_scan", fail_if_scanned)
+    monkeypatch.chdir(tmp_path)
+
+    result = runner.invoke(app, ["auth-sources", "list"], terminal_width=180)
+
+    assert result.exit_code == 0
+    assert result.stdout.count("available") == 2
+    assert list(tmp_path.iterdir()) == []
+    assert ubuntu_fixture.read_bytes() == original_contents[ubuntu_fixture]
+    assert rhel_fixture.read_bytes() == original_contents[rhel_fixture]
+
+
 def test_reports_command_group_registers_list_and_show() -> None:
     root_command = get_command(app)
 

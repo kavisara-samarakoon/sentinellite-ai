@@ -77,6 +77,40 @@ def test_collect_auth_events_from_sample_file() -> None:
     assert events[3].event_type == "sudo_command"
 
 
+@pytest.mark.parametrize(
+    ("fixture_path", "expected_usernames", "expected_source_ips"),
+    [
+        (
+            Path("examples/auth_logs/sample_ubuntu_auth.log"),
+            ["labadmin", "demo-user", "demo-user"],
+            ["192.0.2.10", "192.0.2.11", None],
+        ),
+        (
+            Path("examples/auth_logs/sample_rhel_secure.log"),
+            ["audit-user", "ops-user", "ops-user"],
+            ["198.51.100.20", "203.0.113.21", None],
+        ),
+    ],
+)
+def test_collect_auth_events_from_traditional_linux_fixture(
+    fixture_path: Path,
+    expected_usernames: list[str],
+    expected_source_ips: list[str | None],
+) -> None:
+    fixture_lines = fixture_path.read_text(encoding="utf-8").splitlines()
+
+    events = collect_auth_events_from_file(fixture_path)
+
+    assert len(fixture_lines) == 4
+    assert [event.event_type for event in events] == [
+        "ssh_failed_login",
+        "ssh_successful_login",
+        "sudo_command",
+    ]
+    assert [event.username for event in events] == expected_usernames
+    assert [event.source_ip for event in events] == expected_source_ips
+
+
 def test_missing_auth_log_file_raises_error() -> None:
     with pytest.raises(AuthLogNotFoundError) as error_info:
         collect_auth_events_from_file("examples/auth_logs/missing.log")
