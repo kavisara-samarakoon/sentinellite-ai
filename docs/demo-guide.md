@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This guide provides a safe, professional flow for demonstrating the SentinelLite AI `v0.5.0-alpha` in-development milestone. The demonstration focuses on explicit local TOML configuration, implemented defensive monitoring, transparent detection results, local deterministic alert explanations, optional JSON explanation export, and the project's current limitations.
+This guide provides a safe, professional flow for demonstrating the SentinelLite AI `v0.6.0-alpha` in-development milestone. The demonstration focuses on explicit local TOML configuration, implemented defensive monitoring, transparent detection results, local deterministic alert explanations, optional JSON explanation export, read-only local report review, and the project's current limitations.
 
 ## Demo Environment
 
@@ -244,6 +244,49 @@ Each alert contains information suitable for review and later integration, inclu
 
 Open a generated JSON report after a scan to show how terminal summaries connect to structured, reviewable alert data. Default reports contain no explanation objects. Reports created with `--include-explanations` add one deterministic `explanation` object inside each alert, while preserving the same five top-level fields and adding no top-level `explanations` field.
 
+## Local Report Review Demo
+
+Create a clean temporary report directory and generate one authentication report with stored deterministic explanations:
+
+```bash
+rm -rf /tmp/sentinellite-v06-demo-reports
+python -m sentinellite scan-auth examples/auth_logs/sample_auth.log --output-dir /tmp/sentinellite-v06-demo-reports --include-explanations
+```
+
+List the compatible reports in that explicit directory:
+
+```bash
+python -m sentinellite reports list --report-dir /tmp/sentinellite-v06-demo-reports
+```
+
+Use the Python standard library to print the exact generated report path:
+
+```bash
+python - <<'PY'
+from pathlib import Path
+
+reports = sorted(Path("/tmp/sentinellite-v06-demo-reports").glob("*.json"))
+assert len(reports) == 1, reports
+print(reports[0])
+PY
+```
+
+Pass that exact path to `reports show`. For example:
+
+```bash
+REPORT_PATH="$(python - <<'PY'
+from pathlib import Path
+
+reports = sorted(Path("/tmp/sentinellite-v06-demo-reports").glob("*.json"))
+assert len(reports) == 1, reports
+print(reports[0])
+PY
+)"
+python -m sentinellite reports show "$REPORT_PATH"
+```
+
+The review commands read only local report files and do not modify them. `reports show` prints a normalized summary and compact alert fields without evidence or raw JSON by default. It displays only whether a stored explanation object is present; it does not print the explanation body or regenerate an explanation from current templates.
+
 ## Safe Demo Notes
 
 - SentinelLite AI is a defensive-only project.
@@ -251,6 +294,9 @@ Open a generated JSON report after a scan to show how terminal summaries connect
 - It does not perform port scanning.
 - It does not send network packets.
 - It does not repair or modify observed files.
+- Report listing and review are local and read-only.
+- Report review does not print evidence or raw JSON by default.
+- Stored explanations are not regenerated during report review.
 - Alerts are investigation-focused and do not claim malware classification.
 - Deterministic explanations are local rule templates and do not call an AI model, LLM, or API.
 - AI-assisted alert explanation is planned but is not implemented yet.
@@ -271,11 +317,14 @@ Only demonstrate the project on systems and data that you are authorized to obse
 10. Create and scan a file integrity baseline.
 11. Review deterministic explanation panels when a scan produces alerts.
 12. Compare default and opt-in JSON reports and show the nested per-alert explanation.
-13. Explain the current limitations and next roadmap items.
+13. Generate a report in `/tmp` and demonstrate `reports list`.
+14. Demonstrate `reports show` with the exact generated report path.
+15. Explain the current limitations and next roadmap items.
 
 ## Current Limitations
 
 - There is no persistent monitoring daemon yet.
+- Report review has no filters, database, or persistent index.
 - There is no dashboard yet.
 - Config files must be selected explicitly with `--config`; automatic discovery is not implemented.
 - JSON explanation export requires `--include-explanations` or `reporting.include_explanations = true` in an explicitly selected config.
