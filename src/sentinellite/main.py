@@ -24,7 +24,12 @@ from sentinellite.pipeline.file_integrity_scan import run_file_integrity_scan
 from sentinellite.pipeline.network_scan import run_network_scan
 from sentinellite.pipeline.process_scan import run_process_scan
 from sentinellite.reporting.json_reporter import read_alert_report
-from sentinellite.reporting.review import ReportReviewError, list_report_entries
+from sentinellite.reporting.review import (
+    ReportReviewError,
+    build_report_summary,
+    list_report_entries,
+    load_review_report,
+)
 
 console = Console()
 CURRENT_VERSION = "0.5.0-alpha"
@@ -50,6 +55,18 @@ def _literal_text(
     if max_length is not None and len(rendered) > max_length:
         rendered = f"{rendered[: max_length - 3]}..."
     return Text(rendered, style=style)
+
+
+def _format_summary_sequence(value: object) -> str:
+    if not isinstance(value, (list, tuple)):
+        return "-"
+    return ", ".join(str(item) for item in value) or "-"
+
+
+def _format_summary_counts(value: object) -> str:
+    if not isinstance(value, Mapping):
+        return "-"
+    return ", ".join(f"{key}: {count}" for key, count in value.items()) or "-"
 
 
 def _alert_value(alert: object, field_name: str) -> object | None:
@@ -371,6 +388,77 @@ def reports_list_command(
 
     if invalid_entries:
         raise typer.Exit(code=1)
+
+
+@reports_app.command("show")
+def reports_show_command(report_path: Path) -> None:
+    """Show a safe summary of one local SentinelLite JSON alert report."""
+    try:
+        report = load_review_report(report_path)
+        summary = build_report_summary(report)
+    except ReportReviewError as error:
+        console.print(
+            _literal_text(
+                f"[!] Report review error: {error}",
+                max_length=240,
+                style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    summary_table = Table(title="SentinelLite Alert Report Summary")
+    summary_table.add_column("Field", style="bold")
+    summary_table.add_column("Value")
+    summary_table.add_row("File path", _literal_text(summary["path"], max_length=160))
+    summary_table.add_row("Report ID", _literal_text(summary["report_id"], max_length=120))
+    summary_table.add_row(
+        "Report type",
+        _literal_text(summary["report_type"], max_length=60),
+    )
+    summary_table.add_row(
+        "Generated timestamp",
+        _literal_text(summary["generated_at"], max_length=60),
+    )
+    summary_table.add_row("Alert count", _literal_text(summary["alert_count"]))
+    summary_table.add_row(
+        "Stored explanation count",
+        _literal_text(summary["explanation_count"]),
+    )
+    summary_table.add_row(
+        "Rule IDs",
+        _literal_text(_format_summary_sequence(summary["rule_ids"]), max_length=160),
+    )
+    summary_table.add_row(
+        "Severity counts",
+        _literal_text(_format_summary_counts(summary["severity_counts"]), max_length=160),
+    )
+    summary_table.add_row(
+        "Risk level counts",
+        _literal_text(_format_summary_counts(summary["risk_level_counts"]), max_length=160),
+    )
+    console.print(summary_table)
+
+    alert_table = Table(title="Stored Alerts")
+    alert_table.add_column("Rule ID")
+    alert_table.add_column("Severity")
+    alert_table.add_column("Risk")
+    alert_table.add_column("Category")
+    alert_table.add_column("Message")
+    alert_table.add_column("Explanation")
+
+    for alert in report.alerts:
+        alert_table.add_row(
+            _literal_text(alert.rule_id, max_length=32),
+            _literal_text(alert.severity, max_length=20),
+            _literal_text(f"{alert.risk_level} ({alert.risk_score})", max_length=32),
+            _literal_text(alert.category, max_length=40),
+            _literal_text(alert.message, max_length=120),
+            _literal_text("yes" if alert.has_explanation else "no"),
+        )
+
+    console.print(alert_table)
+    if not report.alerts:
+        console.print(_literal_text("No alerts stored in this report."))
 
 
 @app.command("scan-auth")
