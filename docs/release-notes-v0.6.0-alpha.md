@@ -27,9 +27,18 @@ This milestone adds local, read-only history and review commands for SentinelLit
 
 ## Validation
 
-- Automated Ruff, Pytest, CLI status, report generation, report listing, exact-path report review, and malformed-report smoke validation is defined for this milestone.
-- macOS development validation: pending
-- Ubuntu ARM64 validation: pending
+- macOS development validation: passed
+- Ubuntu ARM64 validation: passed
+- Ruff: passed
+- Pytest: passed with 490 tests
+- CLI status displayed `SentinelLite AI v0.6.0-alpha`.
+- Report review smoke validation: passed
+  - `scan-auth` generated one JSON report.
+  - `reports list` displayed the generated report as valid.
+  - `reports show` displayed the report summary and stored alerts.
+  - JSON compatibility preserved the five top-level fields: `report_id`, `report_type`, `generated_at`, `alert_count`, and `alerts`.
+  - Stored explanation review showed explanation presence without printing nested explanation bodies.
+  - Invalid and malformed report handling exited non-zero cleanly without a traceback.
 
 ## Safety Scope
 
