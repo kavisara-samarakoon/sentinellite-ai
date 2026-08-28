@@ -53,6 +53,50 @@ jobs:
           python -m sentinellite scan-auth examples/auth_logs/sample_auth.log | tee /tmp/sentinellite-auth-smoke.txt
           grep -Fq "Deterministic Alert Explanations" /tmp/sentinellite-auth-smoke.txt
 
+      - name: Validate local report review commands
+        run: |
+          report_dir=/tmp/sentinellite-v06-reports
+          invalid_report="$report_dir/invalid.json"
+          rm -rf "$report_dir"
+
+          python -m sentinellite scan-auth examples/auth_logs/sample_auth.log --output-dir "$report_dir"
+          python -m sentinellite reports list --report-dir "$report_dir"
+
+          report_path="$(python - "$report_dir" <<'PY'
+          import sys
+          from pathlib import Path
+
+          reports = sorted(Path(sys.argv[1]).glob("*.json"))
+          assert len(reports) == 1, reports
+          print(reports[0])
+          PY
+          )"
+          python -m sentinellite reports show "$report_path" | tee /tmp/sentinellite-v06-show.txt
+          grep -Fq "SentinelLite Alert Report Summary" /tmp/sentinellite-v06-show.txt
+
+          python - "$invalid_report" <<'PY'
+          import sys
+          from pathlib import Path
+
+          Path(sys.argv[1]).write_text('{"invalid":', encoding="utf-8")
+          PY
+
+          set +e
+          python -m sentinellite reports list --report-dir "$report_dir" > /tmp/sentinellite-v06-mixed-list.txt 2>&1
+          mixed_list_status=$?
+          python -m sentinellite reports show "$invalid_report" > /tmp/sentinellite-v06-invalid-show.txt 2>&1
+          invalid_show_status=$?
+          set -e
+
+          cat /tmp/sentinellite-v06-mixed-list.txt
+          cat /tmp/sentinellite-v06-invalid-show.txt
+          test "$mixed_list_status" -ne 0
+          test "$invalid_show_status" -ne 0
+          grep -Fq "Malformed JSON" /tmp/sentinellite-v06-mixed-list.txt
+          grep -Fq "Malformed JSON" /tmp/sentinellite-v06-invalid-show.txt
+          ! grep -Fq "Traceback" /tmp/sentinellite-v06-mixed-list.txt
+          ! grep -Fq "Traceback" /tmp/sentinellite-v06-invalid-show.txt
+
       - name: Run authentication JSON explanation smoke test
         run: |
           smoke_dir=/tmp/sentinellite-json-explanation-smoke

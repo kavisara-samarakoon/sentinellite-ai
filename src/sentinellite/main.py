@@ -6,6 +6,7 @@ import typer
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
+from rich.text import Text
 
 from sentinellite.collectors.system import SystemInfo, collect_system_info
 from sentinellite.config import SentinelLiteConfig, default_config, write_default_config
@@ -23,14 +24,49 @@ from sentinellite.pipeline.file_integrity_scan import run_file_integrity_scan
 from sentinellite.pipeline.network_scan import run_network_scan
 from sentinellite.pipeline.process_scan import run_process_scan
 from sentinellite.reporting.json_reporter import read_alert_report
+from sentinellite.reporting.review import (
+    ReportReviewError,
+    build_report_summary,
+    list_report_entries,
+    load_review_report,
+)
 
 console = Console()
-CURRENT_VERSION = "0.5.0-alpha"
+CURRENT_VERSION = "0.6.0-alpha"
 
 app = typer.Typer(
     help="SentinelLite AI - Lightweight Linux endpoint detection and monitoring agent.",
     invoke_without_command=True,
 )
+reports_app = typer.Typer(
+    help="Review local SentinelLite JSON alert reports.",
+    no_args_is_help=True,
+)
+app.add_typer(reports_app, name="reports")
+
+
+def _literal_text(
+    value: object,
+    *,
+    max_length: int | None = None,
+    style: str | None = None,
+) -> Text:
+    rendered = "".join(character if character.isprintable() else " " for character in str(value))
+    if max_length is not None and len(rendered) > max_length:
+        rendered = f"{rendered[: max_length - 3]}..."
+    return Text(rendered, style=style)
+
+
+def _format_summary_sequence(value: object) -> str:
+    if not isinstance(value, (list, tuple)):
+        return "-"
+    return ", ".join(str(item) for item in value) or "-"
+
+
+def _format_summary_counts(value: object) -> str:
+    if not isinstance(value, Mapping):
+        return "-"
+    return ", ".join(f"{key}: {count}" for key, count in value.items()) or "-"
 
 
 def _alert_value(alert: object, field_name: str) -> object | None:
@@ -272,6 +308,157 @@ def config_init_command(
         "Example: python -m sentinellite "
         f"--config {created_path} scan-auth examples/auth_logs/sample_auth.log"
     )
+
+
+@reports_app.command("list")
+def reports_list_command(
+    ctx: typer.Context,
+    report_dir: Annotated[
+        Path | None,
+        typer.Option(
+            "--report-dir",
+            help="Directory containing SentinelLite JSON alert reports.",
+        ),
+    ] = None,
+) -> None:
+    """List local SentinelLite JSON alert reports without modifying them."""
+    effective_report_dir = (
+        report_dir
+        if report_dir is not None
+        else _selected_config(ctx).reporting.output_dir
+    )
+
+    try:
+        entries = list_report_entries(effective_report_dir)
+    except ReportReviewError as error:
+        console.print(
+            _literal_text(
+                f"[!] Report review error: {error}",
+                max_length=240,
+                style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    if not entries:
+        console.print(
+            _literal_text(
+                f"No JSON alert reports found in {effective_report_dir}",
+                max_length=240,
+            )
+        )
+        return
+
+    table = Table(title="SentinelLite Alert Reports")
+    table.add_column("Generated At")
+    table.add_column("Alerts", justify="right")
+    table.add_column("Report Type")
+    table.add_column("Status")
+    table.add_column("File")
+
+    invalid_entries = []
+    for entry in entries:
+        if entry.status == "invalid":
+            invalid_entries.append(entry)
+
+        generated_at = entry.generated_at.isoformat() if entry.generated_at else "-"
+        alert_count = str(entry.alert_count) if entry.alert_count is not None else "-"
+        report_type = entry.report_type if entry.report_type is not None else "-"
+        status_style = "green" if entry.status == "valid" else "red"
+
+        table.add_row(
+            _literal_text(generated_at, max_length=40),
+            _literal_text(alert_count, max_length=12),
+            _literal_text(report_type, max_length=40),
+            _literal_text(entry.status, max_length=16, style=status_style),
+            _literal_text(entry.path.name, max_length=80),
+        )
+
+    console.print(table)
+
+    for entry in invalid_entries:
+        diagnostic = entry.error or "Report is invalid."
+        console.print(
+            _literal_text(
+                f"Invalid report {entry.path.name}: {diagnostic}",
+                max_length=240,
+                style="red",
+            )
+        )
+
+    if invalid_entries:
+        raise typer.Exit(code=1)
+
+
+@reports_app.command("show")
+def reports_show_command(report_path: Path) -> None:
+    """Show a safe summary of one local SentinelLite JSON alert report."""
+    try:
+        report = load_review_report(report_path)
+        summary = build_report_summary(report)
+    except ReportReviewError as error:
+        console.print(
+            _literal_text(
+                f"[!] Report review error: {error}",
+                max_length=240,
+                style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    summary_table = Table(title="SentinelLite Alert Report Summary")
+    summary_table.add_column("Field", style="bold")
+    summary_table.add_column("Value")
+    summary_table.add_row("File path", _literal_text(summary["path"], max_length=160))
+    summary_table.add_row("Report ID", _literal_text(summary["report_id"], max_length=120))
+    summary_table.add_row(
+        "Report type",
+        _literal_text(summary["report_type"], max_length=60),
+    )
+    summary_table.add_row(
+        "Generated timestamp",
+        _literal_text(summary["generated_at"], max_length=60),
+    )
+    summary_table.add_row("Alert count", _literal_text(summary["alert_count"]))
+    summary_table.add_row(
+        "Stored explanation count",
+        _literal_text(summary["explanation_count"]),
+    )
+    summary_table.add_row(
+        "Rule IDs",
+        _literal_text(_format_summary_sequence(summary["rule_ids"]), max_length=160),
+    )
+    summary_table.add_row(
+        "Severity counts",
+        _literal_text(_format_summary_counts(summary["severity_counts"]), max_length=160),
+    )
+    summary_table.add_row(
+        "Risk level counts",
+        _literal_text(_format_summary_counts(summary["risk_level_counts"]), max_length=160),
+    )
+    console.print(summary_table)
+
+    alert_table = Table(title="Stored Alerts")
+    alert_table.add_column("Rule ID")
+    alert_table.add_column("Severity")
+    alert_table.add_column("Risk")
+    alert_table.add_column("Category")
+    alert_table.add_column("Message")
+    alert_table.add_column("Explanation")
+
+    for alert in report.alerts:
+        alert_table.add_row(
+            _literal_text(alert.rule_id, max_length=32),
+            _literal_text(alert.severity, max_length=20),
+            _literal_text(f"{alert.risk_level} ({alert.risk_score})", max_length=32),
+            _literal_text(alert.category, max_length=40),
+            _literal_text(alert.message, max_length=120),
+            _literal_text("yes" if alert.has_explanation else "no"),
+        )
+
+    console.print(alert_table)
+    if not report.alerts:
+        console.print(_literal_text("No alerts stored in this report."))
 
 
 @app.command("scan-auth")

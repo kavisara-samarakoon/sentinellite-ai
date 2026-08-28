@@ -6,7 +6,7 @@ The project is a Python CLI tool focused on defensive Linux security monitoring.
 
 ## Current Status
 
-Current milestone: `v0.5.0-alpha` (in development; not released)
+Current milestone: `v0.6.0-alpha` (in development; not released)
 
 Current milestone status:
 
@@ -50,7 +50,9 @@ Current milestone status:
 - Deterministic explanations displayed by scan commands when scored alerts exist
 - Optional deterministic JSON explanation export implemented behind `--include-explanations`
 - Default JSON alert reports retain the existing five-field top-level structure
-- 414 automated tests passing
+- Read-only local report discovery and validation implemented
+- `reports list` and `reports show REPORT_PATH` commands implemented
+- 490 automated tests passing
 
 Baseline-backed file integrity monitoring is implemented and has been validated on Ubuntu ARM64. See the [Linux ARM64 validation notes](docs/linux-validation.md).
 
@@ -64,7 +66,9 @@ See the [v0.3.0-alpha release notes](docs/release-notes-v0.3.0-alpha.md) for the
 
 See the [v0.4.0-alpha release notes](docs/release-notes-v0.4.0-alpha.md) for the optional JSON explanation export milestone.
 
-See the [v0.5.0-alpha release notes](docs/release-notes-v0.5.0-alpha.md) for the current explicit TOML configuration milestone.
+See the [v0.5.0-alpha release notes](docs/release-notes-v0.5.0-alpha.md) for the published explicit TOML configuration milestone.
+
+See the [v0.6.0-alpha release notes](docs/release-notes-v0.6.0-alpha.md) for the current local report review milestone.
 
 ## Security Scope
 
@@ -104,6 +108,8 @@ It is not intended for:
 - It does not create, delete, repair, or modify monitored files.
 - `baseline-files` writes only the explicitly requested baseline JSON file.
 - `scan-files-baseline` writes only its JSON alert report.
+- `reports list` and `reports show` read existing local reports without modifying them.
+- Report review does not call an AI model, LLM, external API, or explanation service.
 
 ## Implemented Features
 
@@ -143,6 +149,8 @@ It is not intended for:
 - Local explanation generation with generic fallback guidance
 - Rich terminal explanation panels for scored alerts
 - Optional nested JSON alert explanations requested with `--include-explanations`
+- Read-only discovery and validation of existing local JSON alert reports
+- Report directory listing and exact-path report summaries
 
 ## Planned Features
 
@@ -492,9 +500,40 @@ Example report structure:
 
 The nested `explanation` shown above is present only in an opt-in report. Explanations are generated locally from deterministic rule templates and existing alert evidence.
 
+### Reviewing Existing Reports
+
+List compatible JSON alert reports in the default `reports/` directory:
+
+```bash
+python -m sentinellite reports list
+```
+
+Select another local report directory explicitly or through an explicitly selected config:
+
+```bash
+python -m sentinellite reports list --report-dir /tmp/sentinellite-reports
+python -m sentinellite --config sentinellite.toml reports list
+```
+
+Directory selection for `reports list` follows this precedence:
+
+```text
+--report-dir > selected config reporting.output_dir > reports/
+```
+
+Show a safe summary of one report by its exact file path:
+
+```bash
+python -m sentinellite reports show /tmp/sentinellite-reports/alerts-....json
+```
+
+Both review commands are local and read-only. They do not write reports, change the report schema, create a database or persistent index, start a daemon, or call an AI model, LLM, or external API. `reports show` displays normalized metadata and compact alert fields without printing evidence or raw JSON by default. It reports only whether each stored explanation is present; it does not print the nested explanation body or regenerate explanations from current templates.
+
+Malformed and incompatible reports fail with concise diagnostics and no raw-content dump. `reports list` keeps valid and invalid entries visible together, then exits non-zero when a directory contains invalid JSON report candidates. Report filters are not included in v0.6.
+
 ## Testing
 
-The current test suite contains 414 tests covering configuration, collectors, baseline models and persistence, normalization, detection, scoring, reporting, deterministic explanations, pipelines, and CLI behavior.
+The current test suite contains 490 tests covering configuration, collectors, baseline models and persistence, normalization, detection, scoring, reporting, deterministic explanations, report review, pipelines, and CLI behavior.
 
 Run all tests:
 
@@ -514,10 +553,12 @@ Recommended full local check:
 ruff check src tests
 pytest
 python -m sentinellite
-python -m sentinellite config-init --path /tmp/sentinellite-v05.toml
-python -m sentinellite --config /tmp/sentinellite-v05.toml scan-auth examples/auth_logs/sample_auth.log
+python -m sentinellite config-init --path /tmp/sentinellite-v06.toml
+python -m sentinellite --config /tmp/sentinellite-v06.toml scan-auth examples/auth_logs/sample_auth.log
 python -m sentinellite scan-auth examples/auth_logs/sample_auth.log
 python -m sentinellite scan-auth examples/auth_logs/sample_auth.log --include-explanations
+python -m sentinellite reports list
+python -m sentinellite reports show reports/alerts-....json
 python -m sentinellite scan-process
 python -m sentinellite scan-network
 python -m sentinellite scan-files README.md
@@ -611,6 +652,15 @@ File integrity rules report current observation conditions such as an absent pat
 - Configurable reporting directory and JSON explanation export
 - Validated rule disabling through `rules.disabled_ids`
 - Monitoring-module gating before collection and report or baseline writing
+
+### Version 0.6
+
+- Read-only discovery and validation of local SentinelLite JSON alert reports
+- `reports list` with explicit, configured, and default directory selection
+- `reports show REPORT_PATH` summaries for exact report paths
+- Clean malformed and incompatible report diagnostics
+- Backward-compatible v0.5 JSON report schema
+- No filters, database, persistent index, daemon, external API, AI, or LLM behavior
 
 ### Version 1.0
 

@@ -56,6 +56,44 @@ def write_reporting_config(
     return config_path
 
 
+def review_alert(**overrides: object) -> dict[str, object]:
+    alert: dict[str, object] = {
+        "rule_id": "AUTH-001",
+        "severity": "medium",
+        "risk_level": "medium",
+        "risk_score": 50,
+        "category": "authentication",
+        "message": "Failed SSH login attempt",
+    }
+    alert.update(overrides)
+    return alert
+
+
+def write_review_report(
+    report_dir: Path,
+    *,
+    filename: str = "alerts-valid.json",
+    generated_at: str = "2026-08-28T10:00:00+00:00",
+    alerts: list[dict[str, object]] | None = None,
+) -> Path:
+    report_dir.mkdir(parents=True, exist_ok=True)
+    report_path = report_dir / filename
+    report_alerts = [review_alert()] if alerts is None else alerts
+    report_path.write_text(
+        json.dumps(
+            {
+                "report_id": f"sentinellite-report-{generated_at}",
+                "report_type": "sentinellite_alert_report",
+                "generated_at": generated_at,
+                "alert_count": len(report_alerts),
+                "alerts": report_alerts,
+            }
+        ),
+        encoding="utf-8",
+    )
+    return report_path
+
+
 def test_config_init_creates_valid_default_toml(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -1030,7 +1068,7 @@ def test_default_status_describes_implemented_and_planned_modules() -> None:
     result = runner.invoke(app)
 
     assert result.exit_code == 0
-    assert "SentinelLite AI v0.5.0-alpha" in result.stdout
+    assert "SentinelLite AI v0.6.0-alpha" in result.stdout
     assert "│ Authentication Monitor  │ Enabled │" in result.stdout
     assert "│ Process Monitor         │ Enabled │" in result.stdout
     assert "│ Network Monitor         │ Enabled │" in result.stdout
@@ -1491,3 +1529,541 @@ def test_scan_files_baseline_missing_file_fails_cleanly(tmp_path: Path) -> None:
     normalized_stdout = result.stdout.replace("\n", "")
     assert "missing-baseline.json" in normalized_stdout
     assert "No such file or directory" in result.stdout
+
+
+def test_reports_command_group_registers_list_and_show() -> None:
+    root_command = get_command(app)
+
+    reports_command = root_command.commands["reports"]
+
+    assert "list" in reports_command.commands
+    assert "show" in reports_command.commands
+
+
+def test_reports_list_empty_directory_exits_zero(tmp_path: Path) -> None:
+    report_dir = tmp_path / "empty-reports"
+    report_dir.mkdir()
+
+    result = runner.invoke(
+        app,
+        ["reports", "list", "--report-dir", str(report_dir)],
+    )
+
+    assert result.exit_code == 0
+    assert "No JSON alert reports found in" in result.stdout
+    assert str(report_dir) in result.stdout.replace("\n", "")
+    assert list(report_dir.iterdir()) == []
+
+
+def test_reports_list_displays_valid_report_without_modifying_it(tmp_path: Path) -> None:
+    report_path = write_review_report(tmp_path / "reports")
+    original_content = report_path.read_text(encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        ["reports", "list", "--report-dir", str(report_path.parent)],
+    )
+
+    assert result.exit_code == 0
+    assert "Generated At" in result.stdout
+    assert "Alerts" in result.stdout
+    assert "Report Type" in result.stdout
+    assert "Status" in result.stdout
+    assert "File" in result.stdout
+    assert "2026-08-28" in result.stdout
+    assert "valid" in result.stdout
+    assert report_path.name in result.stdout
+    assert report_path.read_text(encoding="utf-8") == original_content
+
+
+def test_reports_list_uses_builtin_default_reports_directory(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    report_path = write_review_report(tmp_path / "reports", filename="default.json")
+
+    result = runner.invoke(app, ["reports", "list"])
+
+    assert result.exit_code == 0
+    assert report_path.name in result.stdout
+
+
+def test_reports_list_uses_configured_reporting_directory(tmp_path: Path) -> None:
+    config_path = write_reporting_config(tmp_path)
+    report_path = write_review_report(
+        tmp_path / "configured-reports",
+        filename="configured.json",
+    )
+
+    result = runner.invoke(
+        app,
+        ["--config", str(config_path), "reports", "list"],
+    )
+
+    assert result.exit_code == 0
+    assert report_path.name in result.stdout
+
+
+def test_reports_list_report_dir_overrides_configured_directory(
+    tmp_path: Path,
+) -> None:
+    config_path = write_reporting_config(tmp_path)
+    configured_report = write_review_report(
+        tmp_path / "configured-reports",
+        filename="configured.json",
+    )
+    override_dir = tmp_path / "override-reports"
+    override_report = write_review_report(override_dir, filename="override.json")
+
+    result = runner.invoke(
+        app,
+        [
+            "--config",
+            str(config_path),
+            "reports",
+            "list",
+            "--report-dir",
+            str(override_dir),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert override_report.name in result.stdout
+    assert configured_report.name not in result.stdout
+
+
+def test_reports_list_missing_directory_fails_cleanly(tmp_path: Path) -> None:
+    missing_dir = tmp_path / "missing-reports"
+
+    result = runner.invoke(
+        app,
+        ["reports", "list", "--report-dir", str(missing_dir)],
+    )
+    normalized_output = result.stdout.replace("\n", "")
+
+    assert result.exit_code == 1
+    assert "Report directory not found" in result.stdout
+    assert "missing-reports" in normalized_output
+    assert "Traceback" not in result.stdout
+
+
+def test_reports_list_non_directory_path_fails_cleanly(tmp_path: Path) -> None:
+    report_path = write_review_report(tmp_path)
+
+    result = runner.invoke(
+        app,
+        ["reports", "list", "--report-dir", str(report_path)],
+    )
+    normalized_output = result.stdout.replace("\n", "")
+
+    assert result.exit_code == 1
+    assert "not a directory" in result.stdout
+    assert report_path.name in normalized_output
+    assert "Traceback" not in result.stdout
+
+
+def test_reports_list_shows_valid_and_invalid_entries_then_exits_nonzero(
+    tmp_path: Path,
+) -> None:
+    report_dir = tmp_path / "mixed-reports"
+    valid_path = write_review_report(report_dir, filename="valid.json")
+    invalid_path = report_dir / "invalid.json"
+    invalid_path.write_text("not JSON", encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        ["reports", "list", "--report-dir", str(report_dir)],
+    )
+
+    assert result.exit_code == 1
+    assert valid_path.name in result.stdout
+    assert invalid_path.name in result.stdout
+    assert "valid" in result.stdout
+    assert "invalid" in result.stdout
+    assert "Malformed JSON" in result.stdout
+    assert "not JSON" not in result.stdout
+    assert "Traceback" not in result.stdout
+
+
+def test_reports_list_renders_report_filename_as_literal_text(tmp_path: Path) -> None:
+    report_dir = tmp_path / "literal-reports"
+    report_path = write_review_report(
+        report_dir,
+        filename="[red]literal.json",
+    )
+
+    result = runner.invoke(
+        app,
+        ["reports", "list", "--report-dir", str(report_dir)],
+    )
+
+    assert result.exit_code == 0
+    assert report_path.name in result.stdout
+
+
+def test_reports_list_config_error_occurs_before_listing(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    config_path = tmp_path / "invalid.toml"
+    config_path.write_text("[reporting\n", encoding="utf-8")
+    listing_called = False
+
+    def fake_list_report_entries(_report_dir: Path) -> list[object]:
+        nonlocal listing_called
+        listing_called = True
+        return []
+
+    monkeypatch.setattr(
+        "sentinellite.main.list_report_entries",
+        fake_list_report_entries,
+    )
+
+    result = runner.invoke(
+        app,
+        ["--config", str(config_path), "reports", "list"],
+    )
+
+    assert result.exit_code == 1
+    assert "Failed to load configuration" in result.stdout
+    assert "Traceback" not in result.stdout
+    assert listing_called is False
+
+
+def test_reports_list_is_not_blocked_by_disabled_modules(tmp_path: Path) -> None:
+    report_dir = tmp_path / "disabled-module-reports"
+    report_path = write_review_report(report_dir)
+    config_path = tmp_path / "disabled-modules.toml"
+    config_path.write_text(
+        f"""config_version = 1
+
+[reporting]
+output_dir = "{report_dir}"
+
+[modules]
+authentication = false
+process = false
+network = false
+file_integrity = false
+""",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        ["--config", str(config_path), "reports", "list"],
+    )
+
+    assert result.exit_code == 0
+    assert report_path.name in result.stdout
+    assert "disabled by configuration" not in result.stdout
+
+
+def test_reports_list_ignores_disabled_rule_selection(tmp_path: Path) -> None:
+    config_path = write_reporting_config(tmp_path, disabled_ids=("AUTH-001",))
+    report_path = write_review_report(tmp_path / "configured-reports")
+
+    result = runner.invoke(
+        app,
+        ["--config", str(config_path), "reports", "list"],
+    )
+
+    assert result.exit_code == 0
+    assert report_path.name in result.stdout
+
+
+def test_reports_commands_register_no_filters_ai_or_llm_options() -> None:
+    root_command = get_command(app)
+    reports_command = root_command.commands["reports"]
+    list_command = reports_command.commands["list"]
+    show_command = reports_command.commands["show"]
+    registered_options = {
+        option
+        for parameter in (
+            *reports_command.params,
+            *list_command.params,
+            *show_command.params,
+        )
+        for option in (
+            *getattr(parameter, "opts", ()),
+            *getattr(parameter, "secondary_opts", ()),
+        )
+    }
+
+    assert "--report-dir" in registered_options
+    assert "--rule-id" not in registered_options
+    assert "--severity" not in registered_options
+    assert "--risk-level" not in registered_options
+    assert "--ai" not in registered_options
+    assert "--llm" not in registered_options
+
+
+def test_reports_show_displays_report_summary_fields_without_modifying_file(
+    tmp_path: Path,
+) -> None:
+    report_path = write_review_report(tmp_path / "reports", filename="summary.json")
+    original_content = report_path.read_text(encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        ["reports", "show", str(report_path)],
+        terminal_width=180,
+    )
+
+    assert result.exit_code == 0
+    assert "SentinelLite Alert Report Summary" in result.stdout
+    assert "File path" in result.stdout
+    assert str(report_path)[:30] in result.stdout
+    assert "Report ID" in result.stdout
+    assert "sentinellite-report-2026-08-28T10:00:00+00:00" in result.stdout
+    assert "Report type" in result.stdout
+    assert "sentinellite_alert_report" in result.stdout
+    assert "Generated timestamp" in result.stdout
+    assert "2026-08-28T10:00:00+00:00" in result.stdout
+    assert "Alert count" in result.stdout
+    assert "Stored explanation count" in result.stdout
+    assert "Rule IDs" in result.stdout
+    assert "AUTH-001" in result.stdout
+    assert "Severity counts" in result.stdout
+    assert "medium: 1" in result.stdout
+    assert "Risk level counts" in result.stdout
+    assert report_path.read_text(encoding="utf-8") == original_content
+
+
+def test_reports_show_displays_compact_alert_table(tmp_path: Path) -> None:
+    report_path = write_review_report(tmp_path / "reports")
+
+    result = runner.invoke(
+        app,
+        ["reports", "show", str(report_path)],
+        terminal_width=180,
+    )
+
+    assert result.exit_code == 0
+    assert "Stored Alerts" in result.stdout
+    assert "Rule ID" in result.stdout
+    assert "Severity" in result.stdout
+    assert "Risk" in result.stdout
+    assert "Category" in result.stdout
+    assert "Message" in result.stdout
+    assert "Explanation" in result.stdout
+    assert "AUTH-001" in result.stdout
+    assert "medium (50)" in result.stdout
+    assert "authentic" in result.stdout
+    assert "Failed SSH" in result.stdout
+    assert "login" in result.stdout
+    assert "attempt" in result.stdout
+
+
+def test_reports_show_counts_and_marks_stored_explanations_without_body(
+    tmp_path: Path,
+) -> None:
+    report_path = write_review_report(
+        tmp_path / "reports",
+        alerts=[
+            review_alert(
+                explanation={
+                    "summary": "NEVER_RENDER_STORED_EXPLANATION_BODY",
+                    "recommended_actions": ["Do not render this"],
+                }
+            ),
+            review_alert(
+                rule_id="NET-001",
+                category="network",
+                message="Network observation",
+            ),
+        ],
+    )
+
+    result = runner.invoke(
+        app,
+        ["reports", "show", str(report_path)],
+        terminal_width=180,
+    )
+
+    normalized_output = " ".join(result.stdout.split())
+    assert result.exit_code == 0
+    assert "Stored explanation count │ 1 │" in normalized_output
+    assert "yes" in result.stdout
+    assert "no" in result.stdout
+    assert "NEVER_RENDER_STORED_EXPLANATION_BODY" not in result.stdout
+    assert "Do not render this" not in result.stdout
+
+
+def test_reports_show_valid_empty_report(tmp_path: Path) -> None:
+    report_path = write_review_report(tmp_path / "reports", alerts=[])
+
+    result = runner.invoke(
+        app,
+        ["reports", "show", str(report_path)],
+        terminal_width=180,
+    )
+
+    normalized_output = " ".join(result.stdout.split())
+    assert result.exit_code == 0
+    assert "Alert count │ 0 │" in normalized_output
+    assert "Stored explanation count │ 0 │" in normalized_output
+    assert "Stored Alerts" in result.stdout
+    assert "No alerts stored in this report." in result.stdout
+
+
+def test_reports_show_missing_file_fails_cleanly(tmp_path: Path) -> None:
+    missing_path = tmp_path / "missing.json"
+
+    result = runner.invoke(app, ["reports", "show", str(missing_path)])
+    normalized_output = result.stdout.replace("\n", "")
+
+    assert result.exit_code == 1
+    assert "Report file not found" in result.stdout
+    assert "missing.json" in normalized_output
+    assert "Traceback" not in result.stdout
+
+
+def test_reports_show_malformed_json_fails_cleanly_without_dumping_content(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / "malformed.json"
+    report_path.write_text('{"secret": "RAW_REPORT_CONTENT"', encoding="utf-8")
+
+    result = runner.invoke(app, ["reports", "show", str(report_path)])
+
+    assert result.exit_code == 1
+    assert "Malformed JSON" in result.stdout
+    assert "line 1" in result.stdout
+    assert "RAW_REPORT_CONTENT" not in result.stdout
+    assert "Traceback" not in result.stdout
+
+
+def test_reports_show_incompatible_shape_fails_cleanly_without_raw_json(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / "incompatible.json"
+    report_path.write_text(
+        json.dumps({"secret": "INCOMPATIBLE_RAW_CONTENT"}),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["reports", "show", str(report_path)])
+
+    assert result.exit_code == 1
+    assert "supportedreport_type" in "".join(result.stdout.split())
+    assert "INCOMPATIBLE_RAW_CONTENT" not in result.stdout
+    assert "Traceback" not in result.stdout
+
+
+def test_reports_show_does_not_print_evidence_or_raw_json(tmp_path: Path) -> None:
+    report_path = write_review_report(
+        tmp_path / "reports",
+        alerts=[
+            review_alert(
+                evidence={
+                    "username": "SENSITIVE_EVIDENCE_USERNAME",
+                    "source_ip": "192.0.2.10",
+                }
+            )
+        ],
+    )
+
+    result = runner.invoke(
+        app,
+        ["reports", "show", str(report_path)],
+        terminal_width=180,
+    )
+
+    assert result.exit_code == 0
+    assert "SENSITIVE_EVIDENCE_USERNAME" not in result.stdout
+    assert "192.0.2.10" not in result.stdout
+    assert '"alerts"' not in result.stdout
+    assert '"evidence"' not in result.stdout
+
+
+def test_reports_show_does_not_regenerate_explanations(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    report_path = write_review_report(
+        tmp_path / "reports",
+        alerts=[review_alert(explanation={"summary": "Stored only"})],
+    )
+
+    def fail_if_called(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("reports show must not regenerate explanations")
+
+    monkeypatch.setattr(
+        "sentinellite.main.generate_alert_explanation",
+        fail_if_called,
+    )
+
+    result = runner.invoke(app, ["reports", "show", str(report_path)])
+
+    assert result.exit_code == 0
+    assert "yes" in result.stdout
+
+
+def test_reports_show_renders_markup_literally_and_removes_control_characters(
+    tmp_path: Path,
+) -> None:
+    report_path = write_review_report(
+        tmp_path / "reports",
+        alerts=[
+            review_alert(
+                rule_id="[red]X",
+                message="safe\x1bcontrol",
+            )
+        ],
+    )
+
+    result = runner.invoke(
+        app,
+        ["reports", "show", str(report_path)],
+        terminal_width=180,
+    )
+
+    assert result.exit_code == 0
+    assert "[red]X" in result.stdout
+    assert "safe control" in result.stdout
+    assert "\x1b" not in result.stdout
+
+
+def test_reports_show_is_not_blocked_by_disabled_modules(tmp_path: Path) -> None:
+    report_path = write_review_report(tmp_path / "explicit-reports")
+    config_path = tmp_path / "disabled-modules-show.toml"
+    config_path.write_text(
+        """config_version = 1
+
+[reporting]
+output_dir = "unrelated-reports"
+
+[modules]
+authentication = false
+process = false
+network = false
+file_integrity = false
+""",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        ["--config", str(config_path), "reports", "show", str(report_path)],
+        terminal_width=180,
+    )
+
+    assert result.exit_code == 0
+    assert "AUTH-001" in result.stdout
+    assert "disabled by configuration" not in result.stdout
+
+
+def test_reports_show_ignores_disabled_rule_selection(tmp_path: Path) -> None:
+    config_path = write_reporting_config(tmp_path, disabled_ids=("AUTH-001",))
+    report_path = write_review_report(tmp_path / "explicit-reports")
+
+    result = runner.invoke(
+        app,
+        ["--config", str(config_path), "reports", "show", str(report_path)],
+        terminal_width=180,
+    )
+
+    assert result.exit_code == 0
+    assert "AUTH-001" in result.stdout
