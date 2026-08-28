@@ -6,6 +6,10 @@ import pytest
 from typer.main import get_command
 from typer.testing import CliRunner
 
+from sentinellite.collectors.auth_sources import (
+    DEFAULT_AUTH_LOG_CANDIDATES,
+    AuthLogSourceEntry,
+)
 from sentinellite.config import default_config, load_config
 from sentinellite.detection.rules import DEFAULT_RULES, DetectionRule
 from sentinellite.main import app
@@ -1529,6 +1533,338 @@ def test_scan_files_baseline_missing_file_fails_cleanly(tmp_path: Path) -> None:
     normalized_stdout = result.stdout.replace("\n", "")
     assert "missing-baseline.json" in normalized_stdout
     assert "No such file or directory" in result.stdout
+
+
+def test_auth_sources_command_group_registers_list() -> None:
+    root_command = get_command(app)
+
+    auth_sources_command = root_command.commands["auth-sources"]
+
+    assert "list" in auth_sources_command.commands
+
+
+def test_auth_sources_list_displays_default_candidates_and_all_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    entries = tuple(
+        AuthLogSourceEntry(
+            family=candidate.family,
+            path=candidate.path,
+            status="missing",
+            error=f"Authentication log file not found: {candidate.path}",
+        )
+        for candidate in DEFAULT_AUTH_LOG_CANDIDATES
+    )
+
+    def fake_discovery(candidates: object) -> tuple[AuthLogSourceEntry, ...]:
+        assert candidates == DEFAULT_AUTH_LOG_CANDIDATES
+        return entries
+
+    monkeypatch.setattr(
+        "sentinellite.main.discover_auth_log_sources",
+        fake_discovery,
+    )
+
+    result = runner.invoke(app, ["auth-sources", "list"])
+    normalized_output = result.stdout.replace("\n", "")
+
+    assert result.exit_code == 0
+    assert "Family" in result.stdout
+    assert "Path" in result.stdout
+    assert "Status" in result.stdout
+    assert "Diagnostic" in result.stdout
+    assert "debian_ubuntu" in result.stdout
+    assert "rhel_fedora" in result.stdout
+    assert "/var/log/auth.log" in normalized_output
+    assert "/var/log/secure" in normalized_output
+    assert result.stdout.count("missing") >= 2
+    assert "Traceback" not in result.stdout
+
+
+def test_auth_sources_list_shows_available_and_missing_candidates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    available_path = Path("/tmp/auth.log")
+    entries = (
+        AuthLogSourceEntry("debian_ubuntu", available_path, "available", None),
+        AuthLogSourceEntry(
+            "rhel_fedora",
+            Path("/var/log/secure"),
+            "missing",
+            "Authentication log file not found: /var/log/secure",
+        ),
+    )
+    monkeypatch.setattr(
+        "sentinellite.main.discover_auth_log_sources",
+        lambda _candidates: entries,
+    )
+
+    result = runner.invoke(app, ["auth-sources", "list"])
+
+    assert result.exit_code == 0
+    assert "available" in result.stdout
+    assert "missing" in result.stdout
+    assert available_path.name in result.stdout
+
+
+def test_auth_sources_list_shows_unsupported_and_unreadable_statuses(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    entries = (
+        AuthLogSourceEntry(
+            "debian_ubuntu",
+            Path("/var/log/auth.log"),
+            "unsupported",
+            "Authentication log path is not a regular file: /var/log/auth.log",
+        ),
+        AuthLogSourceEntry(
+            "rhel_fedora",
+            Path("/var/log/secure"),
+            "unreadable",
+            "Unable to open authentication log '/var/log/secure': permission denied",
+        ),
+    )
+    monkeypatch.setattr(
+        "sentinellite.main.discover_auth_log_sources",
+        lambda _candidates: entries,
+    )
+
+    result = runner.invoke(app, ["auth-sources", "list"])
+
+    assert result.exit_code == 0
+    assert "unsupported" in result.stdout
+    assert "unreadable" in result.stdout
+    assert "not a regular file" in result.stdout
+    assert "permission denied" in result.stdout
+    assert "Traceback" not in result.stdout
+
+
+def test_auth_sources_list_does_not_print_contents_and_renders_literal_values(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    log_path = Path("[p]auth.log")
+    secret_content = "private-authentication-log-content"
+    log_path.write_text(secret_content, encoding="utf-8")
+    original_content = log_path.read_text(encoding="utf-8")
+    entries = (
+        AuthLogSourceEntry("[f]", log_path, "[s]", "[d]\nline"),
+    )
+    monkeypatch.setattr(
+        "sentinellite.main.discover_auth_log_sources",
+        lambda _candidates: entries,
+    )
+
+    result = runner.invoke(app, ["auth-sources", "list"])
+    normalized_output = result.stdout.replace("\n", "")
+
+    assert result.exit_code == 0
+    assert "[f]" in normalized_output
+    assert "[p]" in normalized_output
+    assert "[s]" in normalized_output
+    assert "[d]" in normalized_output
+    assert secret_content not in result.stdout
+    assert log_path.read_text(encoding="utf-8") == original_content
+
+
+def test_auth_sources_list_does_not_invoke_auth_scan_pipeline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "sentinellite.main.discover_auth_log_sources",
+        lambda _candidates: (),
+    )
+
+    def fail_if_scanned(*_args: object, **_kwargs: object) -> None:
+        pytest.fail("auth-sources list must not invoke the scan pipeline")
+
+    monkeypatch.setattr("sentinellite.main.run_auth_scan", fail_if_scanned)
+
+    result = runner.invoke(app, ["auth-sources", "list"])
+
+    assert result.exit_code == 0
+    assert "Authentication Scan Complete" not in result.stdout
+
+
+def test_auth_sources_list_is_not_blocked_by_disabled_authentication_module(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    config_path = tmp_path / "disabled-auth.toml"
+    config_path.write_text(
+        """config_version = 1
+
+[modules]
+authentication = false
+process = true
+network = true
+file_integrity = true
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "sentinellite.main.discover_auth_log_sources",
+        lambda _candidates: (),
+    )
+
+    result = runner.invoke(
+        app,
+        ["--config", str(config_path), "auth-sources", "list"],
+    )
+
+    assert result.exit_code == 0
+    assert "disabled by configuration" not in result.stdout
+
+
+def test_auth_sources_list_ignores_reporting_and_disabled_rules(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    config_path = write_reporting_config(
+        tmp_path,
+        output_dir="unused-source-inventory-output",
+        disabled_ids=("AUTH-001",),
+    )
+    monkeypatch.setattr(
+        "sentinellite.main.discover_auth_log_sources",
+        lambda _candidates: (),
+    )
+
+    result = runner.invoke(
+        app,
+        ["--config", str(config_path), "auth-sources", "list"],
+    )
+
+    assert result.exit_code == 0
+    assert "unused-source-inventory-output" not in result.stdout
+    assert "AUTH-001" not in result.stdout
+
+
+def test_auth_sources_list_displays_non_linux_note(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "sentinellite.main.discover_auth_log_sources",
+        lambda _candidates: (),
+    )
+    monkeypatch.setattr("sentinellite.main.platform.system", lambda: "Darwin")
+
+    result = runner.invoke(app, ["auth-sources", "list"])
+    normalized_output = result.stdout.replace("\n", "")
+
+    assert result.exit_code == 0
+    assert "Linux authentication log candidates" in result.stdout
+    assert "Explicit sample or custom paths remain supported" in normalized_output
+
+
+def test_auth_sources_and_scan_auth_register_no_auto_ai_or_llm_options() -> None:
+    root_command = get_command(app)
+    auth_sources_command = root_command.commands["auth-sources"]
+    list_command = auth_sources_command.commands["list"]
+    scan_auth_command = root_command.commands["scan-auth"]
+    registered_options = {
+        option
+        for parameter in (
+            *auth_sources_command.params,
+            *list_command.params,
+            *scan_auth_command.params,
+        )
+        for option in (
+            *getattr(parameter, "opts", ()),
+            *getattr(parameter, "secondary_opts", ()),
+        )
+    }
+
+    assert "--auto" not in registered_options
+    assert "--ai" not in registered_options
+    assert "--llm" not in registered_options
+
+
+def test_scan_auth_missing_source_fails_cleanly_without_report(tmp_path: Path) -> None:
+    log_path = tmp_path / "missing-auth.log"
+    report_dir = tmp_path / "reports"
+
+    result = runner.invoke(
+        app,
+        ["scan-auth", str(log_path), "--output-dir", str(report_dir)],
+    )
+    normalized_output = result.stdout.replace("\n", "")
+
+    assert result.exit_code == 1
+    assert "Authentication log source error" in result.stdout
+    assert "Authentication log file not found" in result.stdout
+    assert log_path.name in normalized_output
+    assert "Traceback" not in result.stdout
+    assert not report_dir.exists()
+
+
+def test_scan_auth_directory_source_fails_cleanly_without_report(tmp_path: Path) -> None:
+    log_path = tmp_path / "auth-directory"
+    log_path.mkdir()
+    report_dir = tmp_path / "reports"
+
+    result = runner.invoke(
+        app,
+        ["scan-auth", str(log_path), "--output-dir", str(report_dir)],
+    )
+    normalized_output = result.stdout.replace("\n", "")
+
+    assert result.exit_code == 1
+    assert "Authentication log source error" in result.stdout
+    assert "not a regular file" in normalized_output
+    assert "Traceback" not in result.stdout
+    assert not report_dir.exists()
+
+
+def test_scan_auth_invalid_utf8_source_fails_cleanly_without_report(
+    tmp_path: Path,
+) -> None:
+    log_path = tmp_path / "invalid-auth.log"
+    log_path.write_bytes(b"private-prefix\n\xff\xfe")
+    report_dir = tmp_path / "reports"
+
+    result = runner.invoke(
+        app,
+        ["scan-auth", str(log_path), "--output-dir", str(report_dir)],
+    )
+
+    assert result.exit_code == 1
+    assert "Authentication log source error" in result.stdout
+    assert "not valid UTF-8" in result.stdout
+    assert "private-prefix" not in result.stdout
+    assert "Traceback" not in result.stdout
+    assert not report_dir.exists()
+
+
+def test_scan_auth_permission_error_fails_cleanly_without_report(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    log_path = tmp_path / "protected-auth.log"
+    log_path.write_text("private authentication content\n", encoding="utf-8")
+    report_dir = tmp_path / "reports"
+    original_open = Path.open
+
+    def deny_selected_path(path: Path, *args: object, **kwargs: object):
+        if path == log_path:
+            raise PermissionError("simulated permission denial")
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", deny_selected_path)
+
+    result = runner.invoke(
+        app,
+        ["scan-auth", str(log_path), "--output-dir", str(report_dir)],
+    )
+    compact_output = "".join(result.stdout.split())
+
+    assert result.exit_code == 1
+    assert "Authentication log source error" in result.stdout
+    assert "simulatedpermissiondenial" in compact_output
+    assert "private authentication content" not in result.stdout
+    assert "Traceback" not in result.stdout
+    assert not report_dir.exists()
 
 
 def test_reports_command_group_registers_list_and_show() -> None:
