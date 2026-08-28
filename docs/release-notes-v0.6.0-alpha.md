@@ -2,7 +2,7 @@
 
 ## Release Status
 
-`v0.6.0-alpha` is an in-development alpha milestone until it is formally released. It is intended for controlled demonstration, authorized defensive security learning, and portfolio review. It is not presented as a production EDR release.
+`v0.6.0-alpha` is a published GitHub pre-release alpha milestone. It is intended for controlled demonstration, authorized defensive security learning, and portfolio review. It is not presented as a production EDR release.
 
 ## Release Focus
 
@@ -84,7 +84,7 @@ Optional deterministic explanations remain nested inside individual alerts. Repo
 - There is no database, persistent index, dashboard, or daemon.
 - Config files still require explicit global `--config` selection; automatic discovery is not implemented.
 - Real AI-assisted or LLM-based explanation is not implemented.
-- macOS development and Ubuntu ARM64 validation remain pending for this milestone.
+- macOS development and Ubuntu ARM64 validation passed for this milestone.
 
 ## Author
 
