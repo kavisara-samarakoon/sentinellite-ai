@@ -1,0 +1,4 @@
+Aug 27 11:20:01 rhel-demo sshd[3101]: Failed password for invalid user audit-user from 198.51.100.20 port 42001 ssh2
+Aug 27 11:21:02 rhel-demo sshd[3102]: Accepted password for ops-user from 203.0.113.21 port 42002 ssh2
+Aug 27 11:22:03 rhel-demo sudo:  ops-user : TTY=pts/1 ; PWD=/home/ops-user ; USER=root ; COMMAND=/usr/bin/whoami
+Aug 27 11:23:04 rhel-demo systemd[1]: Started Session cleanup service.

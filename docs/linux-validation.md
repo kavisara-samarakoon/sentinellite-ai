@@ -2,11 +2,56 @@
 
 SentinelLite AI, including baseline-backed file integrity monitoring, was validated successfully in an Ubuntu ARM64 virtual machine. This document records the observed environment, quality checks, CLI status, and scan summaries from that validation run.
 
-## Validation Result
+## v0.7 Authentication Source Compatibility Validation Status
+
+The v0.7 validation passed on macOS development, GitHub CI, and an Ubuntu ARM64 virtual machine. Its authentication scan checks used representative traditional text fixtures and are intentionally separated from both real host-log scanning and the earlier Ubuntu ARM64 runtime record below.
+
+Current v0.7 status:
+
+- GitHub PR CI: passed for both `push` and `pull_request`
+- macOS development validation: passed
+- Ubuntu ARM64 validation for v0.7: passed
+- Ubuntu/Debian-style fixture validation: passed using `examples/auth_logs/sample_ubuntu_auth.log`
+- RHEL/Fedora-style fixture validation: passed using `examples/auth_logs/sample_rhel_secure.log`
+- Fixture pipeline, five-field JSON compatibility, and v0.6 report review validation: passed
+- `auth-sources list` inventory behavior: passed as local and read-only
+- Real authorized `/var/log/auth.log` scan validation: not performed or claimed
+- RHEL/Fedora runtime validation: not performed or claimed
+
+### v0.7 Ubuntu ARM64 Results
+
+| Field | Observed Value |
+|---|---|
+| Operating system | Linux |
+| Architecture | `aarch64` |
+| Python version | `3.14.4` |
+| Ruff | Passed |
+| Pytest | 531 passed |
+| CLI version | `SentinelLite AI v0.7.0-alpha` |
+| Working tree after validation | Clean |
+
+`auth-sources list` completed successfully on the Ubuntu ARM64 VM. It inventoried `/var/log/auth.log` as available and `/var/log/secure` as missing. This confirms candidate inventory behavior only: the command did not read or scan the available host log, and no real `/var/log/auth.log` scan was performed or claimed.
+
+The explicit fixture scans produced these results:
+
+| Fixture | Authentication Events | Alerts |
+|---|---:|---:|
+| Ubuntu/Debian-style `sample_ubuntu_auth.log` | 3 | 3 |
+| RHEL/Fedora-style `sample_rhel_secure.log` | 3 | 3 |
+
+These are fixture-format results, not claims of comprehensive distribution support. In particular, the RHEL/Fedora-style fixture does not constitute Fedora or RHEL runtime validation.
+
+Report review smoke validation also passed. `reports list` displayed a generated fixture report as valid, and `reports show` displayed its summary and stored alerts. Generated JSON preserved exactly the five established top-level fields—`report_id`, `report_type`, `generated_at`, `alert_count`, and `alerts`—and did not add a top-level `explanations` field.
+
+The fixture checks confirm only the currently supported traditional failed SSH password, accepted SSH password, and sudo record shapes. They do not establish compatibility with every record produced by Ubuntu, Debian, RHEL, or Fedora.
+
+`/var/log/auth.log` and `/var/log/secure` are candidate paths rather than guaranteed defaults. Availability depends on the distribution and local logging configuration. `auth-sources list` inventories these candidates without reading or printing log contents and without starting `scan-auth` automatically. A real system path must still be selected explicitly with existing authorized read access; this v0.7 validation did not perform a real host-log scan.
+
+## Earlier Ubuntu ARM64 Validation Result
 
 Result: **Passed**
 
-The application started in its intended Linux runtime mode, all implemented monitoring modules were available, the automated quality checks passed, and each scan command completed successfully.
+In the earlier recorded validation, the application started in its intended Linux runtime mode, all then-implemented monitoring modules were available, the automated quality checks passed, and each scan command completed successfully.
 
 ## Environment
 

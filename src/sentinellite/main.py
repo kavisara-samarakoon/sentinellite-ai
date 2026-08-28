@@ -1,3 +1,4 @@
+import platform
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Annotated, Any
@@ -8,6 +9,11 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from sentinellite.collectors.auth_sources import (
+    DEFAULT_AUTH_LOG_CANDIDATES,
+    AuthLogSourceError,
+    discover_auth_log_sources,
+)
 from sentinellite.collectors.system import SystemInfo, collect_system_info
 from sentinellite.config import SentinelLiteConfig, default_config, write_default_config
 from sentinellite.config.loader import ConfigError, load_config
@@ -32,7 +38,7 @@ from sentinellite.reporting.review import (
 )
 
 console = Console()
-CURRENT_VERSION = "0.6.0-alpha"
+CURRENT_VERSION = "0.7.0-alpha"
 
 app = typer.Typer(
     help="SentinelLite AI - Lightweight Linux endpoint detection and monitoring agent.",
@@ -42,7 +48,12 @@ reports_app = typer.Typer(
     help="Review local SentinelLite JSON alert reports.",
     no_args_is_help=True,
 )
+auth_sources_app = typer.Typer(
+    help="Inspect common Linux authentication log source candidates.",
+    no_args_is_help=True,
+)
 app.add_typer(reports_app, name="reports")
+app.add_typer(auth_sources_app, name="auth-sources")
 
 
 def _literal_text(
@@ -310,6 +321,43 @@ def config_init_command(
     )
 
 
+@auth_sources_app.command("list")
+def auth_sources_list_command() -> None:
+    """List common Linux authentication log candidates without scanning them."""
+    entries = discover_auth_log_sources(DEFAULT_AUTH_LOG_CANDIDATES)
+
+    table = Table(title="Linux Authentication Log Candidates")
+    table.add_column("Family")
+    table.add_column("Path")
+    table.add_column("Status")
+    table.add_column("Diagnostic")
+
+    for entry in entries:
+        status_style = {
+            "available": "green",
+            "missing": "yellow",
+            "unreadable": "red",
+            "unsupported": "red",
+        }.get(entry.status)
+        table.add_row(
+            _literal_text(entry.family, max_length=40),
+            _literal_text(entry.path, max_length=120),
+            _literal_text(entry.status, max_length=24, style=status_style),
+            _literal_text(entry.error or "-", max_length=160),
+        )
+
+    console.print(table)
+
+    if platform.system() != "Linux":
+        console.print(
+            _literal_text(
+                "Note: These are Linux authentication log candidates. "
+                "Explicit sample or custom paths remain supported by scan-auth.",
+                style="yellow",
+            )
+        )
+
+
 @reports_app.command("list")
 def reports_list_command(
     ctx: typer.Context,
@@ -492,8 +540,14 @@ def scan_auth_command(
             include_explanations=effective_include_explanations,
             rules=rules,
         )
-    except FileNotFoundError as error:
-        console.print(f"[red][!] {error}[/red]")
+    except (AuthLogSourceError, FileNotFoundError) as error:
+        console.print(
+            _literal_text(
+                f"[!] Authentication log source error: {error}",
+                max_length=240,
+                style="red",
+            )
+        )
         raise typer.Exit(code=1) from error
 
     console.print(Panel.fit("Authentication Scan Complete", title="SentinelLite AI", border_style="green"))

@@ -53,6 +53,50 @@ jobs:
           python -m sentinellite scan-auth examples/auth_logs/sample_auth.log | tee /tmp/sentinellite-auth-smoke.txt
           grep -Fq "Deterministic Alert Explanations" /tmp/sentinellite-auth-smoke.txt
 
+      - name: Validate Linux authentication log fixture compatibility
+        run: |
+          ubuntu_report_dir=/tmp/sentinellite-v07-ubuntu-auth
+          rhel_report_dir=/tmp/sentinellite-v07-rhel-secure
+          rm -rf "$ubuntu_report_dir" "$rhel_report_dir"
+
+          python -m sentinellite auth-sources list
+          python -m sentinellite scan-auth examples/auth_logs/sample_ubuntu_auth.log --output-dir "$ubuntu_report_dir"
+          python -m sentinellite scan-auth examples/auth_logs/sample_rhel_secure.log --output-dir "$rhel_report_dir"
+
+          python - "$ubuntu_report_dir" "$rhel_report_dir" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          expected_keys = {
+              "report_id",
+              "report_type",
+              "generated_at",
+              "alert_count",
+              "alerts",
+          }
+          for report_dir_value in sys.argv[1:]:
+              report_paths = sorted(Path(report_dir_value).glob("*.json"))
+              assert len(report_paths) == 1, report_paths
+              report = json.loads(report_paths[0].read_text(encoding="utf-8"))
+              assert set(report) == expected_keys
+              assert report["report_type"] == "sentinellite_alert_report"
+              assert report["alert_count"] == 3
+              assert len(report["alerts"]) == 3
+          PY
+
+          python -m sentinellite reports list --report-dir "$ubuntu_report_dir"
+          ubuntu_report_path="$(python - "$ubuntu_report_dir" <<'PY'
+          import sys
+          from pathlib import Path
+
+          report_paths = sorted(Path(sys.argv[1]).glob("*.json"))
+          assert len(report_paths) == 1, report_paths
+          print(report_paths[0])
+          PY
+          )"
+          python -m sentinellite reports show "$ubuntu_report_path"
+
       - name: Validate local report review commands
         run: |
           report_dir=/tmp/sentinellite-v06-reports

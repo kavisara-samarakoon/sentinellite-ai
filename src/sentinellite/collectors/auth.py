@@ -2,6 +2,14 @@ import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from sentinellite.collectors.auth_sources import (
+    AuthLogNotFoundError,
+    AuthLogUnreadableError,
+    MalformedAuthLogError,
+    UnsupportedAuthLogSourceError,
+    validate_auth_log_path,
+)
+
 
 @dataclass(frozen=True)
 class AuthEvent:
@@ -84,18 +92,31 @@ def parse_auth_line(line: str) -> AuthEvent | None:
 
 
 def collect_auth_events_from_file(log_path: str | Path) -> list[AuthEvent]:
-    path = Path(log_path)
-
-    if not path.exists():
-        raise FileNotFoundError(f"Authentication log file not found: {path}")
-
+    path = validate_auth_log_path(Path(log_path))
     events: list[AuthEvent] = []
 
-    with path.open("r", encoding="utf-8") as file:
-        for line in file:
-            event = parse_auth_line(line)
-            if event is not None:
-                events.append(event)
+    try:
+        with path.open("r", encoding="utf-8") as file:
+            for line in file:
+                event = parse_auth_line(line)
+                if event is not None:
+                    events.append(event)
+    except FileNotFoundError as error:
+        raise AuthLogNotFoundError(
+            f"Authentication log file not found: {path}"
+        ) from error
+    except IsADirectoryError as error:
+        raise UnsupportedAuthLogSourceError(
+            f"Authentication log path is not a regular file: {path}"
+        ) from error
+    except UnicodeDecodeError as error:
+        raise MalformedAuthLogError(
+            f"Authentication log is not valid UTF-8: {path}"
+        ) from error
+    except OSError as error:
+        raise AuthLogUnreadableError(
+            f"Unable to read authentication log '{path}': {error}"
+        ) from error
 
     return events
 
