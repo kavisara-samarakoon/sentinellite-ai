@@ -38,7 +38,7 @@ from sentinellite.reporting.review import (
 )
 
 console = Console()
-CURRENT_VERSION = "0.6.0-alpha"
+CURRENT_VERSION = "0.7.0-alpha"
 
 app = typer.Typer(
     help="SentinelLite AI - Lightweight Linux endpoint detection and monitoring agent.",

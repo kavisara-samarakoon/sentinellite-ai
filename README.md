@@ -6,7 +6,9 @@ The project is a Python CLI tool focused on defensive Linux security monitoring.
 
 ## Current Status
 
-Current milestone: `v0.6.0-alpha` (in development; not released)
+Current milestone: `v0.7.0-alpha` (in development; not released)
+
+The previous `v0.6.0-alpha` local report review milestone is published as a GitHub pre-release.
 
 Current milestone status:
 
@@ -52,7 +54,11 @@ Current milestone status:
 - Default JSON alert reports retain the existing five-field top-level structure
 - Read-only local report discovery and validation implemented
 - `reports list` and `reports show REPORT_PATH` commands implemented
-- 490 automated tests passing
+- Read-only discovery and validation of common Linux authentication log candidates implemented
+- `auth-sources list` inventory command implemented without automatic scanning
+- Clean authentication source errors for missing, unreadable, malformed, and unsupported paths
+- Representative Ubuntu/Debian-style and RHEL/Fedora-style text fixtures implemented
+- 531 automated tests passing
 
 Baseline-backed file integrity monitoring is implemented and has been validated on Ubuntu ARM64. See the [Linux ARM64 validation notes](docs/linux-validation.md).
 
@@ -68,7 +74,9 @@ See the [v0.4.0-alpha release notes](docs/release-notes-v0.4.0-alpha.md) for the
 
 See the [v0.5.0-alpha release notes](docs/release-notes-v0.5.0-alpha.md) for the published explicit TOML configuration milestone.
 
-See the [v0.6.0-alpha release notes](docs/release-notes-v0.6.0-alpha.md) for the current local report review milestone.
+See the [v0.6.0-alpha release notes](docs/release-notes-v0.6.0-alpha.md) for the published local report review milestone.
+
+See the [v0.7.0-alpha release notes](docs/release-notes-v0.7.0-alpha.md) for the current Linux authentication log source compatibility milestone.
 
 ## Security Scope
 
@@ -110,6 +118,9 @@ It is not intended for:
 - `scan-files-baseline` writes only its JSON alert report.
 - `reports list` and `reports show` read existing local reports without modifying them.
 - Report review does not call an AI model, LLM, external API, or explanation service.
+- `auth-sources list` performs local, read-only inventory and does not scan log contents or start `scan-auth`.
+- Authentication scanning requires an explicit `scan-auth LOG_PATH`; candidate discovery never selects a source automatically.
+- SentinelLite AI does not invoke `sudo` or modify log permissions or ownership.
 
 ## Implemented Features
 
@@ -151,6 +162,9 @@ It is not intended for:
 - Optional nested JSON alert explanations requested with `--include-explanations`
 - Read-only discovery and validation of existing local JSON alert reports
 - Report directory listing and exact-path report summaries
+- Read-only inventory of common Linux authentication log candidates
+- Explicit authentication log selection with clean source validation errors
+- Representative traditional Ubuntu/Debian-style and RHEL/Fedora-style fixture coverage
 
 ## Planned Features
 
@@ -261,6 +275,40 @@ The scan commands support `--include-explanations` and `--no-include-explanation
 The `[modules]` values control their corresponding scan commands. Setting a module to `false` makes its command exit non-zero before collection, report writing, or baseline creation. Authentication controls `scan-auth`; process controls `scan-process`; network controls `scan-network`; and file integrity controls `scan-files`, `baseline-files`, and `scan-files-baseline`.
 
 `rules.disabled_ids` accepts validated, case-sensitive rule IDs such as `AUTH-001` or `FIM-004`. Disabled rules are removed before detection, so their alerts and explanations are not generated. Unknown rule IDs cause configuration loading to fail cleanly.
+
+### Linux Authentication Log Sources
+
+List the common Linux authentication log candidates without scanning them:
+
+```bash
+python -m sentinellite auth-sources list
+```
+
+The inventory checks these candidate paths in deterministic order:
+
+- `/var/log/auth.log` for Debian/Ubuntu-style systems
+- `/var/log/secure` for RHEL/Fedora-style systems
+
+These paths are candidates only, not guaranteed defaults. Their availability depends on the operating system and local logging configuration. `auth-sources list` does not recurse through `/var/log`, read or print log contents, start an authentication scan, invoke `sudo`, or modify file permissions or ownership.
+
+Authentication scanning still requires an exact path selected by the user:
+
+```bash
+python -m sentinellite scan-auth LOG_PATH
+```
+
+Protected system logs should be selected only when the current account already has authorized read access. An authorized readable copy can be selected instead. SentinelLite AI does not elevate privileges or provide permission-changing behavior.
+
+Two small, non-sensitive fixtures demonstrate the currently supported traditional text format:
+
+```bash
+python -m sentinellite scan-auth examples/auth_logs/sample_ubuntu_auth.log
+python -m sentinellite scan-auth examples/auth_logs/sample_rhel_secure.log
+```
+
+The fixtures cover failed SSH password login, accepted SSH password login, sudo command, and ignored unrelated records. They do not imply support for every record produced by Ubuntu, Debian, RHEL, or Fedora. A scan with zero recognized events means that no currently supported record matched; it is not a general security guarantee.
+
+Journald input and compressed rotated logs are not supported in v0.7. Authentication source selection is not part of the config schema, and there is no automatic source selection or `scan-auth --auto`. Authentication scans continue to produce the same five-field JSON report structure used by earlier milestones.
 
 Scan a sample authentication log file:
 
@@ -533,7 +581,7 @@ Malformed and incompatible reports fail with concise diagnostics and no raw-cont
 
 ## Testing
 
-The current test suite contains 490 tests covering configuration, collectors, baseline models and persistence, normalization, detection, scoring, reporting, deterministic explanations, report review, pipelines, and CLI behavior.
+The current test suite contains 531 tests covering configuration, collectors, authentication source discovery, Linux text fixtures, baseline models and persistence, normalization, detection, scoring, reporting, deterministic explanations, report review, pipelines, and CLI behavior.
 
 Run all tests:
 
@@ -553,9 +601,12 @@ Recommended full local check:
 ruff check src tests
 pytest
 python -m sentinellite
-python -m sentinellite config-init --path /tmp/sentinellite-v06.toml
-python -m sentinellite --config /tmp/sentinellite-v06.toml scan-auth examples/auth_logs/sample_auth.log
+python -m sentinellite auth-sources list
+python -m sentinellite config-init --path /tmp/sentinellite-v07.toml
+python -m sentinellite --config /tmp/sentinellite-v07.toml scan-auth examples/auth_logs/sample_auth.log
 python -m sentinellite scan-auth examples/auth_logs/sample_auth.log
+python -m sentinellite scan-auth examples/auth_logs/sample_ubuntu_auth.log
+python -m sentinellite scan-auth examples/auth_logs/sample_rhel_secure.log
 python -m sentinellite scan-auth examples/auth_logs/sample_auth.log --include-explanations
 python -m sentinellite reports list
 python -m sentinellite reports show reports/alerts-....json
@@ -661,6 +712,15 @@ File integrity rules report current observation conditions such as an absent pat
 - Clean malformed and incompatible report diagnostics
 - Backward-compatible v0.5 JSON report schema
 - No filters, database, persistent index, daemon, external API, AI, or LLM behavior
+
+### Version 0.7
+
+- Read-only inventory of `/var/log/auth.log` and `/var/log/secure` as common candidates
+- Explicit `scan-auth LOG_PATH` selection retained without automatic defaults
+- Clean errors for missing, unreadable, malformed, and unsupported authentication sources
+- Representative Ubuntu/Debian-style and RHEL/Fedora-style traditional text fixtures
+- JSON report and v0.6 report review compatibility validation
+- No journald, compressed rotation, config source selection, automatic scanning, external API, AI, or LLM behavior
 
 ### Version 1.0
 

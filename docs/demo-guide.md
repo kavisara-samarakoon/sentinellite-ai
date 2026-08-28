@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This guide provides a safe, professional flow for demonstrating the SentinelLite AI `v0.6.0-alpha` in-development milestone. The demonstration focuses on explicit local TOML configuration, implemented defensive monitoring, transparent detection results, local deterministic alert explanations, optional JSON explanation export, read-only local report review, and the project's current limitations.
+This guide provides a safe, professional flow for demonstrating the SentinelLite AI `v0.7.0-alpha` in-development milestone. The demonstration focuses on explicit local TOML configuration, Linux authentication log source compatibility, implemented defensive monitoring, transparent detection results, local deterministic alert explanations, optional JSON explanation export, read-only local report review, and the project's current limitations.
 
 ## Demo Environment
 
@@ -118,6 +118,52 @@ python -m sentinellite scan-auth examples/auth_logs/sample_auth.log
 ```
 
 Explain that SentinelLite AI parses authentication activity, normalizes it into security events, applies transparent detection rules, assigns risk scores, and produces structured alerts.
+
+### Linux Authentication Log Source Compatibility Demo
+
+Inventory the two common Linux authentication log candidates:
+
+```bash
+python -m sentinellite auth-sources list
+```
+
+Explain that the command checks `/var/log/auth.log` as a Debian/Ubuntu-style candidate and `/var/log/secure` as a RHEL/Fedora-style candidate. These are candidates only, not guaranteed defaults. The inventory is local and read-only: it does not read or print log contents, recurse through `/var/log`, select a source, or start a scan automatically.
+
+Run the bundled Ubuntu/Debian-style traditional text fixture into a temporary report directory:
+
+```bash
+python -m sentinellite scan-auth examples/auth_logs/sample_ubuntu_auth.log --output-dir /tmp/sentinellite-v07-ubuntu-auth
+```
+
+Run the bundled RHEL/Fedora-style traditional text fixture into a separate temporary report directory:
+
+```bash
+python -m sentinellite scan-auth examples/auth_logs/sample_rhel_secure.log --output-dir /tmp/sentinellite-v07-rhel-secure
+```
+
+These fixtures demonstrate the currently supported failed SSH password, accepted SSH password, and sudo record shapes. They are representative fixtures, not claims that every distribution record format is supported or that RHEL/Fedora runtime validation has occurred.
+
+List the Ubuntu fixture report:
+
+```bash
+python -m sentinellite reports list --report-dir /tmp/sentinellite-v07-ubuntu-auth
+```
+
+Then resolve its exact path and review it:
+
+```bash
+REPORT_PATH="$(python - <<'PY'
+from pathlib import Path
+
+reports = sorted(Path("/tmp/sentinellite-v07-ubuntu-auth").glob("*.json"))
+assert len(reports) == 1, reports
+print(reports[0])
+PY
+)"
+python -m sentinellite reports show "$REPORT_PATH"
+```
+
+For real system logs, keep `scan-auth LOG_PATH` explicit and select a path only when the current account already has authorized read access, or use an authorized readable copy. Do not change permissions or invoke broad privilege elevation for this demonstration.
 
 ### Deterministic Alert Explanation Demo
 
@@ -291,6 +337,9 @@ The review commands read only local report files and do not modify them. `report
 
 - SentinelLite AI is a defensive-only project.
 - Its implemented collectors perform read-only observations.
+- Authentication source inventory is read-only and never starts a scan automatically.
+- Authentication scans require an explicitly selected path with existing authorized read access.
+- SentinelLite AI does not invoke `sudo` or modify log permissions or ownership.
 - It does not perform port scanning.
 - It does not send network packets.
 - It does not repair or modify observed files.
@@ -309,17 +358,18 @@ Only demonstrate the project on systems and data that you are authorized to obse
 2. Run the Ruff and Pytest quality checks.
 3. Run the main CLI status command.
 4. Create and inspect `sentinellite.toml` with `config-init`.
-5. Run the authentication scan with explicit `--config` selection.
-6. Demonstrate configured reporting, rule disabling, and module gating.
-7. Run the process scan.
-8. Run the network observation scan.
-9. Run the file integrity observation scan.
-10. Create and scan a file integrity baseline.
-11. Review deterministic explanation panels when a scan produces alerts.
-12. Compare default and opt-in JSON reports and show the nested per-alert explanation.
-13. Generate a report in `/tmp` and demonstrate `reports list`.
-14. Demonstrate `reports show` with the exact generated report path.
-15. Explain the current limitations and next roadmap items.
+5. Run `auth-sources list` and explain inventory-only behavior.
+6. Scan both bundled Linux authentication text fixtures with explicit paths.
+7. Review a fixture report with `reports list` and `reports show`.
+8. Run the authentication scan with explicit `--config` selection.
+9. Demonstrate configured reporting, rule disabling, and module gating.
+10. Run the process scan.
+11. Run the network observation scan.
+12. Run the file integrity observation scan.
+13. Create and scan a file integrity baseline.
+14. Review deterministic explanation panels when a scan produces alerts.
+15. Compare default and opt-in JSON reports and show the nested per-alert explanation.
+16. Explain the current limitations and next roadmap items.
 
 ## Current Limitations
 
@@ -327,6 +377,9 @@ Only demonstrate the project on systems and data that you are authorized to obse
 - Report review has no filters, database, or persistent index.
 - There is no dashboard yet.
 - Config files must be selected explicitly with `--config`; automatic discovery is not implemented.
+- Authentication log paths must be selected explicitly; there is no automatic source selection or config source setting.
+- Journald and compressed rotated authentication logs are not supported in v0.7.
+- Candidate file availability under `/var/log` is system-dependent.
 - JSON explanation export requires `--include-explanations` or `reporting.include_explanations = true` in an explicitly selected config.
 - AI-assisted explanation is not implemented yet.
 - The project has a Linux-first design; macOS is supported as a development mode.

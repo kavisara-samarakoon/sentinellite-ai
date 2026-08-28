@@ -2,11 +2,30 @@
 
 SentinelLite AI, including baseline-backed file integrity monitoring, was validated successfully in an Ubuntu ARM64 virtual machine. This document records the observed environment, quality checks, CLI status, and scan summaries from that validation run.
 
-## Validation Result
+## v0.7 Authentication Source Compatibility Validation Status
+
+The v0.7 automated validation is defined for common Linux authentication log source inventory and representative traditional text fixtures. This validation is intentionally separated from the earlier Ubuntu ARM64 runtime record below.
+
+Current v0.7 status:
+
+- Ubuntu/Debian-style fixture validation: defined using `examples/auth_logs/sample_ubuntu_auth.log`
+- RHEL/Fedora-style fixture validation: defined using `examples/auth_logs/sample_rhel_secure.log`
+- Fixture pipeline, five-field JSON compatibility, and v0.6 report review validation: defined
+- `auth-sources list` inventory behavior: defined as local and read-only
+- macOS development validation: pending
+- Ubuntu ARM64 validation for v0.7: pending
+- Real authorized `/var/log/auth.log` validation: pending
+- RHEL/Fedora runtime validation: not yet performed or claimed
+
+The fixture checks confirm only the currently supported traditional failed SSH password, accepted SSH password, and sudo record shapes. They do not establish compatibility with every record produced by Ubuntu, Debian, RHEL, or Fedora.
+
+`/var/log/auth.log` and `/var/log/secure` are candidate paths rather than guaranteed defaults. Availability depends on the distribution and local logging configuration. `auth-sources list` inventories these candidates without reading or printing log contents and without starting `scan-auth` automatically. A real system path must still be selected explicitly with existing authorized read access.
+
+## Earlier Ubuntu ARM64 Validation Result
 
 Result: **Passed**
 
-The application started in its intended Linux runtime mode, all implemented monitoring modules were available, the automated quality checks passed, and each scan command completed successfully.
+In the earlier recorded validation, the application started in its intended Linux runtime mode, all then-implemented monitoring modules were available, the automated quality checks passed, and each scan command completed successfully.
 
 ## Environment
 
