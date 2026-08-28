@@ -1640,10 +1640,11 @@ def test_reports_list_missing_directory_fails_cleanly(tmp_path: Path) -> None:
         app,
         ["reports", "list", "--report-dir", str(missing_dir)],
     )
+    normalized_output = result.stdout.replace("\n", "")
 
     assert result.exit_code == 1
     assert "Report directory not found" in result.stdout
-    assert "missing-reports" in result.stdout
+    assert "missing-reports" in normalized_output
     assert "Traceback" not in result.stdout
 
 
@@ -1654,10 +1655,11 @@ def test_reports_list_non_directory_path_fails_cleanly(tmp_path: Path) -> None:
         app,
         ["reports", "list", "--report-dir", str(report_path)],
     )
+    normalized_output = result.stdout.replace("\n", "")
 
     assert result.exit_code == 1
     assert "not a directory" in result.stdout
-    assert report_path.name in result.stdout
+    assert report_path.name in normalized_output
     assert "Traceback" not in result.stdout
 
 
@@ -1910,10 +1912,11 @@ def test_reports_show_missing_file_fails_cleanly(tmp_path: Path) -> None:
     missing_path = tmp_path / "missing.json"
 
     result = runner.invoke(app, ["reports", "show", str(missing_path)])
+    normalized_output = result.stdout.replace("\n", "")
 
     assert result.exit_code == 1
     assert "Report file not found" in result.stdout
-    assert "missing.json" in result.stdout
+    assert "missing.json" in normalized_output
     assert "Traceback" not in result.stdout
 
 
