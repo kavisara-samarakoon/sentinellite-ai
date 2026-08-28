@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from sentinellite.collectors.auth_sources import MalformedAuthLogError
 from sentinellite.detection.rules import active_rules_from_disabled_ids
 from sentinellite.pipeline.auth_scan import AuthScanSummary, run_auth_scan
 from sentinellite.reporting.json_reporter import read_alert_report
@@ -135,3 +136,14 @@ def test_run_auth_scan_missing_file_raises_error(tmp_path: Path) -> None:
             "examples/auth_logs/missing.log",
             output_dir=tmp_path,
         )
+
+
+def test_auth_scan_input_failure_does_not_write_report(tmp_path: Path) -> None:
+    log_path = tmp_path / "invalid-auth.log"
+    log_path.write_bytes(b"\xff\xfe")
+    report_dir = tmp_path / "reports"
+
+    with pytest.raises(MalformedAuthLogError):
+        run_auth_scan(log_path, output_dir=report_dir)
+
+    assert not report_dir.exists()
