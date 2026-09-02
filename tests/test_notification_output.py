@@ -1,3 +1,6 @@
+import json
+import os
+import stat
 from copy import deepcopy
 from dataclasses import FrozenInstanceError
 from datetime import UTC, datetime
@@ -10,9 +13,11 @@ from sentinellite.reporting.notification import (
     NOTIFICATION_OUTPUT_TYPE,
     NOTIFICATION_SCHEMA_VERSION,
     NotificationAlertSummary,
+    NotificationOutputError,
     NotificationSummary,
     build_notification_summary,
     notification_summary_to_dict,
+    write_notification_summary,
 )
 from sentinellite.reporting.review import ReviewedAlert, ReviewedReport, validate_report_data
 
@@ -284,3 +289,189 @@ def test_builder_uses_stored_risk_score_without_rescoring() -> None:
         "custom-stored-level",
         "another-stored-level",
     ]
+
+
+def test_writer_produces_exact_pretty_json_schema_with_trailing_newline(
+    tmp_path: Path,
+) -> None:
+    summary = build_notification_summary(reviewed_report((reviewed_alert(),)))
+    output_path = tmp_path / "notification.json"
+    expected_data = notification_summary_to_dict(summary)
+
+    written_path = write_notification_summary(summary, output_path)
+
+    assert written_path == output_path
+    assert json.loads(output_path.read_text(encoding="utf-8")) == expected_data
+    assert output_path.read_text(encoding="utf-8") == (
+        json.dumps(expected_data, indent=2, sort_keys=True) + "\n"
+    )
+
+
+def test_writer_requires_existing_parent_directory(tmp_path: Path) -> None:
+    output_path = tmp_path / "missing" / "notification.json"
+
+    with pytest.raises(NotificationOutputError, match="parent directory does not exist"):
+        write_notification_summary(build_notification_summary(reviewed_report()), output_path)
+
+    assert not output_path.parent.exists()
+    assert not output_path.exists()
+
+
+def test_writer_requires_parent_to_be_directory(tmp_path: Path) -> None:
+    parent_file = tmp_path / "parent-file"
+    parent_file.write_text("preserve parent", encoding="utf-8")
+    output_path = parent_file / "notification.json"
+
+    with pytest.raises(NotificationOutputError, match="parent path is not a directory"):
+        write_notification_summary(build_notification_summary(reviewed_report()), output_path)
+
+    assert parent_file.read_text(encoding="utf-8") == "preserve parent"
+
+
+def test_writer_refuses_existing_file_without_modification(tmp_path: Path) -> None:
+    output_path = tmp_path / "existing.json"
+    output_path.write_text("preserve existing output", encoding="utf-8")
+
+    with pytest.raises(NotificationOutputError, match="overwrite refused"):
+        write_notification_summary(build_notification_summary(reviewed_report()), output_path)
+
+    assert output_path.read_text(encoding="utf-8") == "preserve existing output"
+
+
+def test_writer_refuses_existing_symlink_output(tmp_path: Path) -> None:
+    symlink_target = tmp_path / "target.json"
+    symlink_target.write_text("preserve target", encoding="utf-8")
+    output_path = tmp_path / "notification.json"
+    try:
+        output_path.symlink_to(symlink_target)
+    except OSError as error:
+        pytest.skip(f"Symlink creation is unavailable: {error}")
+
+    with pytest.raises(NotificationOutputError, match="symbolic link"):
+        write_notification_summary(build_notification_summary(reviewed_report()), output_path)
+
+    assert output_path.is_symlink()
+    assert symlink_target.read_text(encoding="utf-8") == "preserve target"
+
+
+def test_writer_refuses_existing_directory_output(tmp_path: Path) -> None:
+    output_path = tmp_path / "notification.json"
+    output_path.mkdir()
+
+    with pytest.raises(NotificationOutputError, match="existing directory"):
+        write_notification_summary(build_notification_summary(reviewed_report()), output_path)
+
+    assert output_path.is_dir()
+
+
+def test_writer_exclusive_creation_prevents_race_overwrite(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / "notification.json"
+    real_open = os.open
+
+    def racing_open(path: Path, flags: int, mode: int) -> int:
+        output_path.write_text("created during race", encoding="utf-8")
+        return real_open(path, flags, mode)
+
+    monkeypatch.setattr("sentinellite.reporting.notification.os.open", racing_open)
+
+    with pytest.raises(NotificationOutputError, match="overwrite refused"):
+        write_notification_summary(build_notification_summary(reviewed_report()), output_path)
+
+    assert output_path.read_text(encoding="utf-8") == "created during race"
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX permissions are not available")
+def test_writer_creates_owner_only_output_permissions(tmp_path: Path) -> None:
+    output_path = tmp_path / "notification.json"
+
+    write_notification_summary(build_notification_summary(reviewed_report()), output_path)
+
+    assert stat.S_IMODE(output_path.stat().st_mode) == 0o600
+
+
+def test_write_failure_removes_only_new_partial_output_and_preserves_summary(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    summary = build_notification_summary(reviewed_report((reviewed_alert(),)))
+    summary_before = deepcopy(summary)
+    output_path = tmp_path / "notification.json"
+    unrelated_path = tmp_path / "unrelated.json"
+    unrelated_path.write_text("preserve unrelated file", encoding="utf-8")
+
+    def failing_dump(_data: object, output_file: object, **_kwargs: object) -> None:
+        output_file.write("partial")  # type: ignore[attr-defined]
+        raise OSError("simulated private write failure")
+
+    monkeypatch.setattr("sentinellite.reporting.notification.json.dump", failing_dump)
+
+    with pytest.raises(NotificationOutputError, match="partial output was removed"):
+        write_notification_summary(summary, output_path)
+
+    assert not output_path.exists()
+    assert unrelated_path.read_text(encoding="utf-8") == "preserve unrelated file"
+    assert summary == summary_before
+
+
+def test_written_json_excludes_sensitive_report_and_alert_fields(tmp_path: Path) -> None:
+    source_report = validate_report_data(
+        {
+            "report_id": "sentinellite-report-safe-id",
+            "report_type": "sentinellite_alert_report",
+            "generated_at": "2026-09-02T10:00:00+00:00",
+            "alert_count": 1,
+            "alerts": [
+                {
+                    "rule_id": "AUTH-001",
+                    "category": "authentication",
+                    "severity": "medium",
+                    "risk_score": 50,
+                    "risk_level": "medium",
+                    "message": "PRIVATE_USER 192.0.2.10 sudo PRIVATE_COMMAND",
+                    "evidence": {
+                        "path": "/private/path",
+                        "process_name": "PRIVATE_PROCESS",
+                        "sha256": "PRIVATE_HASH",
+                    },
+                    "explanation": {"summary": "PRIVATE_EXPLANATION"},
+                }
+            ],
+        },
+        Path("private-source-report.json"),
+    )
+    output_path = tmp_path / "notification.json"
+
+    write_notification_summary(build_notification_summary(source_report), output_path)
+    written_text = output_path.read_text(encoding="utf-8")
+
+    for private_value in (
+        "private-source-report.json",
+        "PRIVATE_USER",
+        "192.0.2.10",
+        "PRIVATE_COMMAND",
+        "/private/path",
+        "PRIVATE_PROCESS",
+        "PRIVATE_HASH",
+        "PRIVATE_EXPLANATION",
+        '"message"',
+        '"evidence"',
+        '"explanation"',
+    ):
+        assert private_value not in written_text
+
+
+def test_writer_does_not_modify_source_report_data(tmp_path: Path) -> None:
+    source_path = tmp_path / "source-report.json"
+    source_path.write_bytes(b'{"source": "preserve byte-for-byte"}\n')
+    source_before = source_path.read_bytes()
+    report = reviewed_report((reviewed_alert(),), path=source_path)
+
+    write_notification_summary(
+        build_notification_summary(report),
+        tmp_path / "notification.json",
+    )
+
+    assert source_path.read_bytes() == source_before

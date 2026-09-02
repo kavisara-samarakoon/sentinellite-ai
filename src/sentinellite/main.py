@@ -30,6 +30,11 @@ from sentinellite.pipeline.file_integrity_scan import run_file_integrity_scan
 from sentinellite.pipeline.network_scan import run_network_scan
 from sentinellite.pipeline.process_scan import run_process_scan
 from sentinellite.reporting.json_reporter import read_alert_report
+from sentinellite.reporting.notification import (
+    NotificationOutputError,
+    build_notification_summary,
+    write_notification_summary,
+)
 from sentinellite.reporting.review import (
     ReportReviewError,
     build_report_summary,
@@ -507,6 +512,81 @@ def reports_show_command(report_path: Path) -> None:
     console.print(alert_table)
     if not report.alerts:
         console.print(_literal_text("No alerts stored in this report."))
+
+
+@reports_app.command("export-notification")
+def reports_export_notification_command(
+    report_path: Path,
+    output: Annotated[
+        Path,
+        typer.Option(
+            "--output",
+            help="Exact path for the local notification summary JSON file.",
+        ),
+    ],
+) -> None:
+    """Export a privacy-minimized local notification summary from one report."""
+    try:
+        report = load_review_report(report_path)
+        try:
+            resolved_report_path = report.path.resolve()
+            resolved_output_path = output.resolve(strict=False)
+        except (OSError, RuntimeError):
+            pass
+        else:
+            if resolved_output_path == resolved_report_path:
+                raise NotificationOutputError(
+                    "Notification output path must differ from the source report path."
+                )
+
+        summary = build_notification_summary(report)
+        written_path = write_notification_summary(summary, output)
+    except ReportReviewError as error:
+        console.print(
+            _literal_text(
+                f"[!] Report review error: {error}",
+                max_length=240,
+                style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+    except NotificationOutputError as error:
+        console.print(
+            _literal_text(
+                f"[!] Notification export error: {error}",
+                max_length=240,
+                style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    console.print(
+        _literal_text(
+            "[+] Notification summary exported successfully.",
+            style="green",
+        )
+    )
+    result_table = Table(title="Local Notification Summary Export")
+    result_table.add_column("Field", style="bold")
+    result_table.add_column("Value")
+    result_table.add_row(
+        "Source report ID",
+        _literal_text(summary.source_report_id, max_length=120),
+    )
+    result_table.add_row("Total alerts", _literal_text(summary.alert_count))
+    result_table.add_row(
+        "Included alerts",
+        _literal_text(summary.included_alert_count),
+    )
+    result_table.add_row(
+        "Omitted alerts",
+        _literal_text(summary.omitted_alert_count),
+    )
+    console.print(result_table)
+    console.print(
+        _literal_text(f"Output path: {written_path}"),
+        soft_wrap=True,
+    )
 
 
 @app.command("scan-auth")

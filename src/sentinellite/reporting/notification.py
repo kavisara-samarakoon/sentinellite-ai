@@ -1,11 +1,19 @@
+import json
+import os
+import stat
 from collections import Counter
 from dataclasses import dataclass
+from pathlib import Path
 
 from sentinellite.reporting.review import ReviewedReport
 
 NOTIFICATION_SCHEMA_VERSION = 1
 NOTIFICATION_OUTPUT_TYPE = "sentinellite_notification_summary"
 MAX_INCLUDED_ALERTS = 20
+
+
+class NotificationOutputError(Exception):
+    """Raised for expected local notification output failures."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,3 +103,125 @@ def notification_summary_to_dict(summary: NotificationSummary) -> dict[str, obje
             for alert in summary.alerts
         ],
     }
+
+
+def write_notification_summary(
+    summary: NotificationSummary,
+    output_path: Path,
+) -> Path:
+    """Create one private local JSON summary without overwriting another path."""
+    _validate_output_location(output_path)
+
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+
+    try:
+        file_descriptor = os.open(output_path, flags, 0o600)
+    except FileExistsError as error:
+        raise NotificationOutputError(
+            "Notification output path already exists; overwrite refused."
+        ) from error
+    except IsADirectoryError as error:
+        raise NotificationOutputError(
+            "Notification output path is an existing directory."
+        ) from error
+    except OSError as error:
+        raise NotificationOutputError(
+            "Could not create the notification output file."
+        ) from error
+
+    created_stat: os.stat_result | None = None
+    descriptor_owned = True
+    try:
+        created_stat = os.fstat(file_descriptor)
+        output_file = os.fdopen(
+            file_descriptor,
+            "w",
+            encoding="utf-8",
+            newline="\n",
+        )
+        descriptor_owned = False
+        with output_file:
+            json.dump(
+                notification_summary_to_dict(summary),
+                output_file,
+                indent=2,
+                sort_keys=True,
+            )
+            output_file.write("\n")
+    except (OSError, TypeError, ValueError) as error:
+        if descriptor_owned:
+            try:
+                os.close(file_descriptor)
+            except OSError:
+                pass
+        _cleanup_partial_output(output_path, created_stat)
+        raise NotificationOutputError(
+            "Could not write the notification summary; partial output was removed."
+        ) from error
+
+    return output_path
+
+
+def _validate_output_location(output_path: Path) -> None:
+    try:
+        parent_stat = output_path.parent.stat()
+    except FileNotFoundError as error:
+        raise NotificationOutputError(
+            "Notification output parent directory does not exist."
+        ) from error
+    except OSError as error:
+        raise NotificationOutputError(
+            "Could not inspect the notification output parent directory."
+        ) from error
+
+    if not stat.S_ISDIR(parent_stat.st_mode):
+        raise NotificationOutputError(
+            "Notification output parent path is not a directory."
+        )
+
+    try:
+        target_stat = output_path.lstat()
+    except FileNotFoundError:
+        return
+    except OSError as error:
+        raise NotificationOutputError(
+            "Could not inspect the notification output path."
+        ) from error
+
+    if stat.S_ISLNK(target_stat.st_mode):
+        raise NotificationOutputError(
+            "Notification output path is an existing symbolic link."
+        )
+    if stat.S_ISDIR(target_stat.st_mode):
+        raise NotificationOutputError(
+            "Notification output path is an existing directory."
+        )
+    if stat.S_ISREG(target_stat.st_mode):
+        raise NotificationOutputError(
+            "Notification output path already exists; overwrite refused."
+        )
+    raise NotificationOutputError(
+        "Notification output path exists and is not a regular file."
+    )
+
+
+def _cleanup_partial_output(
+    output_path: Path,
+    created_stat: os.stat_result | None,
+) -> None:
+    if created_stat is None:
+        return
+
+    try:
+        current_stat = output_path.lstat()
+    except (FileNotFoundError, OSError):
+        return
+
+    created_identity = (created_stat.st_dev, created_stat.st_ino)
+    current_identity = (current_stat.st_dev, current_stat.st_ino)
+    if stat.S_ISREG(current_stat.st_mode) and current_identity == created_identity:
+        try:
+            output_path.unlink()
+        except OSError:
+            pass

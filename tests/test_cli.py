@@ -30,6 +30,24 @@ REPORT_KEYS = {
     "alert_count",
     "alerts",
 }
+NOTIFICATION_KEYS = {
+    "schema_version",
+    "output_type",
+    "source",
+    "alert_count",
+    "included_alert_count",
+    "omitted_alert_count",
+    "severity_counts",
+    "risk_level_counts",
+    "alerts",
+}
+NOTIFICATION_ALERT_KEYS = {
+    "rule_id",
+    "category",
+    "severity",
+    "risk_score",
+    "risk_level",
+}
 
 
 def write_reporting_config(
@@ -1957,13 +1975,14 @@ def test_auth_sources_list_does_not_scan_compatibility_fixtures(
     assert rhel_fixture.read_bytes() == original_contents[rhel_fixture]
 
 
-def test_reports_command_group_registers_list_and_show() -> None:
+def test_reports_command_group_registers_list_show_and_export_notification() -> None:
     root_command = get_command(app)
 
     reports_command = root_command.commands["reports"]
 
     assert "list" in reports_command.commands
     assert "show" in reports_command.commands
+    assert "export-notification" in reports_command.commands
 
 
 def test_reports_list_empty_directory_exits_zero(tmp_path: Path) -> None:
@@ -2204,12 +2223,14 @@ def test_reports_commands_register_no_filters_ai_or_llm_options() -> None:
     reports_command = root_command.commands["reports"]
     list_command = reports_command.commands["list"]
     show_command = reports_command.commands["show"]
+    export_command = reports_command.commands["export-notification"]
     registered_options = {
         option
         for parameter in (
             *reports_command.params,
             *list_command.params,
             *show_command.params,
+            *export_command.params,
         )
         for option in (
             *getattr(parameter, "opts", ()),
@@ -2223,6 +2244,34 @@ def test_reports_commands_register_no_filters_ai_or_llm_options() -> None:
     assert "--risk-level" not in registered_options
     assert "--ai" not in registered_options
     assert "--llm" not in registered_options
+
+
+def test_reports_export_notification_registers_only_local_output_option() -> None:
+    root_command = get_command(app)
+    export_command = root_command.commands["reports"].commands["export-notification"]
+    registered_options = {
+        option
+        for parameter in export_command.params
+        for option in (
+            *getattr(parameter, "opts", ()),
+            *getattr(parameter, "secondary_opts", ()),
+        )
+    }
+
+    assert "--output" in registered_options
+    for forbidden_option in (
+        "--send",
+        "--webhook",
+        "--slack",
+        "--discord",
+        "--email",
+        "--sms",
+        "--provider",
+        "--token",
+        "--ai",
+        "--llm",
+    ):
+        assert forbidden_option not in registered_options
 
 
 def test_reports_show_displays_report_summary_fields_without_modifying_file(
@@ -2493,3 +2542,363 @@ def test_reports_show_ignores_disabled_rule_selection(tmp_path: Path) -> None:
 
     assert result.exit_code == 0
     assert "AUTH-001" in result.stdout
+
+
+def test_reports_export_notification_writes_exact_schema_and_preserves_source(
+    tmp_path: Path,
+) -> None:
+    report_path = write_review_report(
+        tmp_path / "reports",
+        alerts=[
+            review_alert(rule_id="AUTH-LOW", risk_score=10, risk_level="info"),
+            review_alert(rule_id="AUTH-HIGH", risk_score=90, risk_level="critical"),
+        ],
+    )
+    source_before = report_path.read_bytes()
+    output_path = tmp_path / "notifications" / "notification.json"
+    output_path.parent.mkdir()
+
+    result = runner.invoke(
+        app,
+        [
+            "reports",
+            "export-notification",
+            str(report_path),
+            "--output",
+            str(output_path),
+        ],
+        terminal_width=180,
+    )
+
+    assert result.exit_code == 0
+    assert report_path.read_bytes() == source_before
+    notification = json.loads(output_path.read_text(encoding="utf-8"))
+    assert set(notification) == NOTIFICATION_KEYS
+    assert notification["schema_version"] == 1
+    assert notification["output_type"] == "sentinellite_notification_summary"
+    assert notification["source"] == {
+        "report_id": "sentinellite-report-2026-08-28T10:00:00+00:00",
+        "generated_at": "2026-08-28T10:00:00+00:00",
+    }
+    assert notification["alert_count"] == 2
+    assert notification["included_alert_count"] == 2
+    assert notification["omitted_alert_count"] == 0
+    assert [alert["rule_id"] for alert in notification["alerts"]] == [
+        "AUTH-HIGH",
+        "AUTH-LOW",
+    ]
+    assert all(set(alert) == NOTIFICATION_ALERT_KEYS for alert in notification["alerts"])
+    assert "Notification summary exported successfully" in result.stdout
+    assert "Source report ID" in result.stdout
+    assert "Total alerts" in result.stdout
+    assert "Included alerts" in result.stdout
+    assert "Omitted alerts" in result.stdout
+    assert str(output_path) in result.stdout.replace("\n", "")
+
+
+def test_reports_export_notification_existing_output_fails_cleanly(
+    tmp_path: Path,
+) -> None:
+    report_path = write_review_report(tmp_path / "reports")
+    output_path = tmp_path / "notification.json"
+    output_path.write_text("preserve output", encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        [
+            "reports",
+            "export-notification",
+            str(report_path),
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Notification export error" in result.stdout
+    assert "overwrite refused" in result.stdout
+    assert "Traceback" not in result.stdout
+    assert output_path.read_text(encoding="utf-8") == "preserve output"
+
+
+def test_reports_export_notification_missing_output_parent_fails_cleanly(
+    tmp_path: Path,
+) -> None:
+    report_path = write_review_report(tmp_path / "reports")
+    output_path = tmp_path / "missing" / "notification.json"
+
+    result = runner.invoke(
+        app,
+        [
+            "reports",
+            "export-notification",
+            str(report_path),
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "parentdirectorydoesnotexist" in "".join(result.stdout.split())
+    assert "Traceback" not in result.stdout
+    assert not output_path.exists()
+
+
+def test_reports_export_notification_directory_output_fails_cleanly(
+    tmp_path: Path,
+) -> None:
+    report_path = write_review_report(tmp_path / "reports")
+    output_path = tmp_path / "notification.json"
+    output_path.mkdir()
+
+    result = runner.invoke(
+        app,
+        [
+            "reports",
+            "export-notification",
+            str(report_path),
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "existingdirectory" in "".join(result.stdout.split())
+    assert "Traceback" not in result.stdout
+    assert output_path.is_dir()
+
+
+def test_reports_export_notification_refuses_source_report_as_output(
+    tmp_path: Path,
+) -> None:
+    report_path = write_review_report(tmp_path / "reports")
+    source_before = report_path.read_bytes()
+
+    result = runner.invoke(
+        app,
+        [
+            "reports",
+            "export-notification",
+            str(report_path),
+            "--output",
+            str(report_path),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "mustdifferfromthesourcereport" in "".join(result.stdout.split())
+    assert "Traceback" not in result.stdout
+    assert report_path.read_bytes() == source_before
+
+
+def test_reports_export_notification_invalid_report_fails_cleanly(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / "invalid.json"
+    report_path.write_text(
+        json.dumps({"output_type": "NOT_RAW_PRIVATE_CONTENT"}),
+        encoding="utf-8",
+    )
+    output_path = tmp_path / "notification.json"
+
+    result = runner.invoke(
+        app,
+        [
+            "reports",
+            "export-notification",
+            str(report_path),
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Report review error" in result.stdout
+    assert "supportedreport_type" in "".join(result.stdout.split())
+    assert "NOT_RAW_PRIVATE_CONTENT" not in result.stdout
+    assert "Traceback" not in result.stdout
+    assert not output_path.exists()
+
+
+def test_reports_export_notification_malformed_report_fails_cleanly(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / "malformed.json"
+    report_path.write_text('{"private": "RAW_PRIVATE_CONTENT"', encoding="utf-8")
+    output_path = tmp_path / "notification.json"
+
+    result = runner.invoke(
+        app,
+        [
+            "reports",
+            "export-notification",
+            str(report_path),
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Malformed JSON" in result.stdout
+    assert "RAW_PRIVATE_CONTENT" not in result.stdout
+    assert "Traceback" not in result.stdout
+    assert not output_path.exists()
+
+
+def test_reports_export_notification_omits_private_content_from_cli_and_json(
+    tmp_path: Path,
+) -> None:
+    private_values = (
+        "PRIVATE_ALERT_MESSAGE",
+        "PRIVATE_USERNAME",
+        "192.0.2.77",
+        "PRIVATE_COMMAND",
+        "PRIVATE_PROCESS",
+        "PRIVATE_HASH",
+        "PRIVATE_EXPLANATION_BODY",
+    )
+    report_path = write_review_report(
+        tmp_path / "reports",
+        alerts=[
+            review_alert(
+                message=" ".join(private_values[:4]),
+                evidence={
+                    "process_name": private_values[4],
+                    "sha256": private_values[5],
+                    "username": private_values[1],
+                    "source_ip": private_values[2],
+                },
+                explanation={"summary": private_values[6]},
+            )
+        ],
+    )
+    output_path = tmp_path / "notification.json"
+
+    result = runner.invoke(
+        app,
+        [
+            "reports",
+            "export-notification",
+            str(report_path),
+            "--output",
+            str(output_path),
+        ],
+        terminal_width=180,
+    )
+    written_text = output_path.read_text(encoding="utf-8")
+
+    assert result.exit_code == 0
+    for private_value in private_values:
+        assert private_value not in result.stdout
+        assert private_value not in written_text
+    assert '"alerts"' not in result.stdout
+    assert '"evidence"' not in result.stdout
+    assert '"explanation"' not in result.stdout
+
+
+def test_reports_export_notification_ignores_disabled_modules_and_rules(
+    tmp_path: Path,
+) -> None:
+    report_path = write_review_report(tmp_path / "explicit-reports")
+    output_path = tmp_path / "notification.json"
+    config_path = tmp_path / "disabled.toml"
+    config_path.write_text(
+        """config_version = 1
+
+[modules]
+authentication = false
+process = false
+network = false
+file_integrity = false
+
+[rules]
+disabled_ids = ["AUTH-001"]
+""",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "--config",
+            str(config_path),
+            "reports",
+            "export-notification",
+            str(report_path),
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert output_path.exists()
+    assert "disabled by configuration" not in result.stdout
+
+
+def test_reports_export_notification_does_not_run_active_processing(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    report_path = write_review_report(tmp_path / "reports")
+    output_path = tmp_path / "notification.json"
+
+    def fail_if_called(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("notification export must use only the stored reviewed report")
+
+    for target in (
+        "sentinellite.main.run_auth_scan",
+        "sentinellite.main.run_process_scan",
+        "sentinellite.main.run_network_scan",
+        "sentinellite.main.run_file_integrity_scan",
+        "sentinellite.main.run_file_integrity_baseline_scan",
+        "sentinellite.main.create_file_integrity_baseline",
+        "sentinellite.main.generate_alert_explanation",
+        "sentinellite.detection.engine.detect_events",
+        "sentinellite.scoring.risk.score_rule_matches",
+    ):
+        monkeypatch.setattr(target, fail_if_called)
+
+    result = runner.invoke(
+        app,
+        [
+            "reports",
+            "export-notification",
+            str(report_path),
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert output_path.exists()
+
+
+def test_reports_list_marks_mixed_notification_summary_as_invalid(
+    tmp_path: Path,
+) -> None:
+    report_dir = tmp_path / "mixed-reports"
+    report_path = write_review_report(report_dir, filename="alerts.json")
+    notification_path = report_dir / "notification.json"
+
+    export_result = runner.invoke(
+        app,
+        [
+            "reports",
+            "export-notification",
+            str(report_path),
+            "--output",
+            str(notification_path),
+        ],
+    )
+    list_result = runner.invoke(
+        app,
+        ["reports", "list", "--report-dir", str(report_dir)],
+    )
+
+    assert export_result.exit_code == 0
+    assert list_result.exit_code == 1
+    assert report_path.name in list_result.stdout
+    assert notification_path.name in list_result.stdout
+    assert "valid" in list_result.stdout
+    assert "invalid" in list_result.stdout
+    assert "supported report_type" in list_result.stdout
