@@ -1,14 +1,14 @@
 # SentinelLite AI
 
-SentinelLite AI is a lightweight Linux endpoint detection and monitoring agent with planned AI-assisted alert analysis.
+SentinelLite AI is a defensive Linux endpoint monitoring and alert review prototype.
 
-The project is a Python CLI tool focused on defensive Linux security monitoring. It collects security-relevant events, applies transparent detection rules, calculates risk levels, generates JSON reports, and presents local, deterministic guidance for investigating scored alerts. AI-assisted explanation remains a future capability and is not implemented.
+The project is a Python CLI tool focused on defensive Linux security monitoring. It collects security-relevant events, applies transparent detection rules, calculates risk levels, generates JSON reports, and presents local, deterministic guidance for investigating scored alerts. It is not a production EDR. Real AI or LLM execution, external notification delivery, and daemon or background-service operation are not implemented.
 
 ## Current Status
 
-Current milestone: `v0.8.0-alpha` (in development; not released)
+Current milestone: `v0.9.0-alpha` (in development; not released)
 
-The previous `v0.7.0-alpha` Linux authentication log source compatibility milestone is published as a GitHub pre-release.
+The previous `v0.8.0-alpha` local notification summary export milestone is published as a GitHub pre-release.
 
 Current milestone status:
 
@@ -62,7 +62,13 @@ Current milestone status:
 - `auth-sources list` inventory command implemented without automatic scanning
 - Clean authentication source errors for missing, unreadable, malformed, and unsupported paths
 - Representative Ubuntu/Debian-style and RHEL/Fedora-style text fixtures implemented
-- 568 automated tests passing
+- Installable Python package metadata and runtime dependency contract implemented
+- Single-source application and package version implemented
+- Packaged default configuration resource implemented
+- Installed `sentinellite` command and side-effect-free `--version` option implemented
+- Editable-install and wheel metadata, resource, and entry-point validation implemented
+- MIT License added
+- 588 automated tests passing before the v0.9 documentation milestone
 
 Baseline-backed file integrity monitoring is implemented and has been validated on Ubuntu ARM64. See the [Linux ARM64 validation notes](docs/linux-validation.md).
 
@@ -82,7 +88,9 @@ See the [v0.6.0-alpha release notes](docs/release-notes-v0.6.0-alpha.md) for the
 
 See the [v0.7.0-alpha release notes](docs/release-notes-v0.7.0-alpha.md) for the published Linux authentication log source compatibility milestone.
 
-See the [v0.8.0-alpha release notes](docs/release-notes-v0.8.0-alpha.md) for the current in-development local notification summary export milestone.
+See the [v0.8.0-alpha release notes](docs/release-notes-v0.8.0-alpha.md) for the published local notification summary export milestone.
+
+See the [v0.9.0-alpha release notes](docs/release-notes-v0.9.0-alpha.md) for the current in-development install and package readiness milestone.
 
 ## Security Scope
 
@@ -219,19 +227,40 @@ python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-Install dependencies:
+Install SentinelLite AI from the cloned repository:
 
 ```bash
-pip install -r requirements.txt
-pip install -e .
+python -m pip install --upgrade pip
+python -m pip install -e .
 ```
 
+Contributors can install the development and validation tools through the `dev` extra:
+
+```bash
+python -m pip install -e ".[dev]"
+```
+
+Verify both supported entry styles:
+
+```bash
+sentinellite --version
+python -m sentinellite --version
+sentinellite
+python -m sentinellite
+```
+
+`sentinellite` is the primary command after installation. `python -m sentinellite` remains fully supported. The virtual environment must be activated, or its `bin` directory must otherwise be present on `PATH`.
+
+The example fixture paths used below are files in this repository and therefore require a cloned checkout. Generated alert reports belong in `reports/`. Generated notification summaries belong in `notifications/`, not `reports/`, because notification JSON uses a separate schema.
+
 ## Usage
+
+The examples use the installed `sentinellite` command. Substitute `python -m sentinellite` when the module entry style is preferred.
 
 Show SentinelLite AI status:
 
 ```bash
-python -m sentinellite
+sentinellite
 ```
 
 ### TOML Configuration
@@ -239,19 +268,19 @@ python -m sentinellite
 Create a default local configuration file without overwriting an existing file:
 
 ```bash
-python -m sentinellite config-init
+sentinellite config-init
 ```
 
 Use `--path` to select another location. Parent directories must already exist:
 
 ```bash
-python -m sentinellite config-init --path configs/sentinellite.toml
+sentinellite config-init --path configs/sentinellite.toml
 ```
 
 Configuration is loaded only when explicitly selected with the global `--config` option:
 
 ```bash
-python -m sentinellite --config sentinellite.toml scan-auth examples/auth_logs/sample_auth.log
+sentinellite --config sentinellite.toml scan-auth examples/auth_logs/sample_auth.log
 ```
 
 SentinelLite AI does not automatically discover `sentinellite.toml` in the current directory. Without `--config`, the built-in defaults preserve the existing behavior: reports go to `reports/`, JSON explanation export is disabled, all monitoring modules are enabled, and all registered rules are active.
@@ -294,7 +323,7 @@ The `[modules]` values control their corresponding scan commands. Setting a modu
 List the common Linux authentication log candidates without scanning them:
 
 ```bash
-python -m sentinellite auth-sources list
+sentinellite auth-sources list
 ```
 
 The inventory checks these candidate paths in deterministic order:
@@ -307,7 +336,7 @@ These paths are candidates only, not guaranteed defaults. Their availability dep
 Authentication scanning still requires an exact path selected by the user:
 
 ```bash
-python -m sentinellite scan-auth LOG_PATH
+sentinellite scan-auth LOG_PATH
 ```
 
 Protected system logs should be selected only when the current account already has authorized read access. An authorized readable copy can be selected instead. SentinelLite AI does not elevate privileges or provide permission-changing behavior.
@@ -315,8 +344,8 @@ Protected system logs should be selected only when the current account already h
 Two small, non-sensitive fixtures demonstrate the currently supported traditional text format:
 
 ```bash
-python -m sentinellite scan-auth examples/auth_logs/sample_ubuntu_auth.log
-python -m sentinellite scan-auth examples/auth_logs/sample_rhel_secure.log
+sentinellite scan-auth examples/auth_logs/sample_ubuntu_auth.log
+sentinellite scan-auth examples/auth_logs/sample_rhel_secure.log
 ```
 
 The fixtures cover failed SSH password login, accepted SSH password login, sudo command, and ignored unrelated records. They do not imply support for every record produced by Ubuntu, Debian, RHEL, or Fedora. A scan with zero recognized events means that no currently supported record matched; it is not a general security guarantee.
@@ -326,7 +355,7 @@ Journald input and compressed rotated logs are not supported in v0.7. Authentica
 Scan a sample authentication log file:
 
 ```bash
-python -m sentinellite scan-auth examples/auth_logs/sample_auth.log
+sentinellite scan-auth examples/auth_logs/sample_auth.log
 ```
 
 When the scan produces scored alerts, the existing alert table is followed by a `Deterministic Alert Explanations` section. Its local rule templates summarize why each rule matched, list possible causes, and recommend investigation steps. No explanation section is printed when there are no scored alerts.
@@ -334,7 +363,7 @@ When the scan produces scored alerts, the existing alert table is followed by a 
 Terminal explanation panels continue to appear whenever a scan produces scored alerts. To also export those deterministic explanations into the JSON alert report, pass the explicit `--include-explanations` option:
 
 ```bash
-python -m sentinellite scan-auth examples/auth_logs/sample_auth.log --include-explanations
+sentinellite scan-auth examples/auth_logs/sample_auth.log --include-explanations
 ```
 
 Without the option or an enabled config setting, JSON reports remain unchanged. With the option, or with `reporting.include_explanations = true`, each alert receives its own nested `explanation` object. Use `--no-include-explanations` to override an enabled config setting. The report does not add a top-level `explanations` field.
@@ -342,55 +371,55 @@ Without the option or an enabled config setting, JSON reports remain unchanged. 
 Scan the current running process list:
 
 ```bash
-python -m sentinellite scan-process
+sentinellite scan-process
 ```
 
 Observe active network connections:
 
 ```bash
-python -m sentinellite scan-network
+sentinellite scan-network
 ```
 
 Scan commands accept an optional output directory. For network observations, use:
 
 ```bash
-python -m sentinellite scan-network --output-dir reports
+sentinellite scan-network --output-dir reports
 ```
 
 Observe one explicitly selected file path:
 
 ```bash
-python -m sentinellite scan-files README.md
+sentinellite scan-files README.md
 ```
 
 Observe multiple explicitly selected paths:
 
 ```bash
-python -m sentinellite scan-files README.md pyproject.toml
+sentinellite scan-files README.md pyproject.toml
 ```
 
 Use a specific report output directory:
 
 ```bash
-python -m sentinellite scan-files README.md --output-dir reports
+sentinellite scan-files README.md --output-dir reports
 ```
 
 Create a trusted baseline from explicitly selected files:
 
 ```bash
-python -m sentinellite baseline-files README.md pyproject.toml --baseline-path file-integrity-baseline.json
+sentinellite baseline-files README.md pyproject.toml --baseline-path file-integrity-baseline.json
 ```
 
 Later, scan the exact paths stored in the saved baseline:
 
 ```bash
-python -m sentinellite scan-files-baseline --baseline-path file-integrity-baseline.json
+sentinellite scan-files-baseline --baseline-path file-integrity-baseline.json
 ```
 
 Use a custom alert report directory for a baseline-backed scan:
 
 ```bash
-python -m sentinellite scan-files-baseline --baseline-path file-integrity-baseline.json --output-dir reports
+sentinellite scan-files-baseline --baseline-path file-integrity-baseline.json --output-dir reports
 ```
 
 The baseline workflow starts by recording a trusted state for selected paths. A later scan observes those same paths and compares their current state with the saved baseline. Changed, missing, appeared, type-changed, and observation-error states become investigation signals. Unchanged files still produce comparison events but do not create alerts. The `not_in_baseline` comparison status is retained as context and is not currently an alert.
@@ -400,7 +429,7 @@ If a monitored file changes, the `FIM-004` alert is followed by a deterministic 
 For example, process scan output can also be directed to `reports/`:
 
 ```bash
-python -m sentinellite scan-process --output-dir reports
+sentinellite scan-process --output-dir reports
 ```
 
 Example scan summary:
@@ -566,14 +595,14 @@ The nested `explanation` shown above is present only in an opt-in report. Explan
 List compatible JSON alert reports in the default `reports/` directory:
 
 ```bash
-python -m sentinellite reports list
+sentinellite reports list
 ```
 
 Select another local report directory explicitly or through an explicitly selected config:
 
 ```bash
-python -m sentinellite reports list --report-dir /tmp/sentinellite-reports
-python -m sentinellite --config sentinellite.toml reports list
+sentinellite reports list --report-dir /tmp/sentinellite-reports
+sentinellite --config sentinellite.toml reports list
 ```
 
 Directory selection for `reports list` follows this precedence:
@@ -585,7 +614,7 @@ Directory selection for `reports list` follows this precedence:
 Show a safe summary of one report by its exact file path:
 
 ```bash
-python -m sentinellite reports show /tmp/sentinellite-reports/alerts-....json
+sentinellite reports show /tmp/sentinellite-reports/alerts-....json
 ```
 
 Both review commands are local and read-only. They do not write reports, change the report schema, create a database or persistent index, start a daemon, or call an AI model, LLM, or external API. `reports show` displays normalized metadata and compact alert fields without printing evidence or raw JSON by default. It reports only whether each stored explanation is present; it does not print the nested explanation body or regenerate explanations from current templates.
@@ -598,7 +627,7 @@ Create the output directory, then export a privacy-minimized summary from one ex
 
 ```bash
 mkdir -p notifications
-python -m sentinellite reports export-notification REPORT_PATH --output notifications/alert-summary.json
+sentinellite reports export-notification REPORT_PATH --output notifications/alert-summary.json
 ```
 
 The output parent directory must already exist, and the output file must not already exist. The command writes JSON only, refuses to overwrite an existing target, and leaves the source report unchanged. Use `notifications/` for these generated artifacts. Do not place notification summaries inside `reports/`: `reports list` treats lowercase `.json` files there as alert-report candidates, and the separate notification schema is intentionally reported as incompatible.
@@ -625,16 +654,16 @@ It excludes:
 
 The notification JSON is a separate output contract, not a SentinelLite alert report. Export does not add fields to the source report, and the established alert-report schema remains unchanged. It uses stored reviewed report data only: it does not collect, detect, rescore, regenerate explanations, or inspect explanation templates.
 
-This is local export only. v0.8 implements no external delivery, network traffic, notification configuration, email, Slack, Discord, webhook, SMS, provider, token, AI, or LLM behavior. Although privacy-minimized, notification summaries can still reveal operational security metadata and should be handled as sensitive artifacts.
+This is local export only. SentinelLite AI implements no external delivery, network traffic, notification configuration, email, Slack, Discord, webhook, SMS, provider, token, AI, or LLM behavior. Although privacy-minimized, notification summaries can still reveal operational security metadata and should be handled as sensitive artifacts.
 
 ## Testing
 
-The current test suite contains 568 tests covering configuration, collectors, authentication source discovery, Linux text fixtures, baseline models and persistence, normalization, detection, scoring, reporting, deterministic explanations, report review, notification export, privacy regression, pipelines, and CLI behavior.
+The test suite passed 588 tests before the v0.9 documentation milestone. Coverage includes packaging, installed entry points, configuration, collectors, authentication source discovery, Linux text fixtures, baseline models and persistence, normalization, detection, scoring, reporting, deterministic explanations, report review, notification export, privacy regression, pipelines, and CLI behavior.
 
 Run all tests:
 
 ```bash
-pytest
+PYTHONDONTWRITEBYTECODE=1 pytest -p no:cacheprovider
 ```
 
 Run lint checks:
@@ -648,23 +677,27 @@ Recommended full local check:
 ```bash
 ruff check --no-cache src tests
 pytest -p no:cacheprovider
-python -m sentinellite
-python -m sentinellite auth-sources list
-python -m sentinellite config-init --path /tmp/sentinellite-v07.toml
-python -m sentinellite --config /tmp/sentinellite-v07.toml scan-auth examples/auth_logs/sample_auth.log
-python -m sentinellite scan-auth examples/auth_logs/sample_auth.log
-python -m sentinellite scan-auth examples/auth_logs/sample_ubuntu_auth.log
-python -m sentinellite scan-auth examples/auth_logs/sample_rhel_secure.log
-python -m sentinellite scan-auth examples/auth_logs/sample_auth.log --include-explanations
-python -m sentinellite reports list
-python -m sentinellite reports show reports/alerts-....json
+python -m pip check
+sentinellite --version
+python -m sentinellite --version
+python -m build --wheel
+sentinellite
+sentinellite auth-sources list
+sentinellite config-init --path /tmp/sentinellite-v07.toml
+sentinellite --config /tmp/sentinellite-v07.toml scan-auth examples/auth_logs/sample_auth.log
+sentinellite scan-auth examples/auth_logs/sample_auth.log
+sentinellite scan-auth examples/auth_logs/sample_ubuntu_auth.log
+sentinellite scan-auth examples/auth_logs/sample_rhel_secure.log
+sentinellite scan-auth examples/auth_logs/sample_auth.log --include-explanations
+sentinellite reports list
+sentinellite reports show reports/alerts-....json
 mkdir -p notifications
-python -m sentinellite reports export-notification reports/alerts-....json --output notifications/alert-summary.json
-python -m sentinellite scan-process
-python -m sentinellite scan-network
-python -m sentinellite scan-files README.md
-python -m sentinellite baseline-files README.md pyproject.toml --baseline-path file-integrity-baseline.json
-python -m sentinellite scan-files-baseline --baseline-path file-integrity-baseline.json
+sentinellite reports export-notification reports/alerts-....json --output notifications/alert-summary.json
+sentinellite scan-process
+sentinellite scan-network
+sentinellite scan-files README.md
+sentinellite baseline-files README.md pyproject.toml --baseline-path file-integrity-baseline.json
+sentinellite scan-files-baseline --baseline-path file-integrity-baseline.json
 ```
 
 ## Current Detection Rules
@@ -772,7 +805,7 @@ File integrity rules report current observation conditions such as an absent pat
 - JSON report and v0.6 report review compatibility validation
 - No journald, compressed rotation, config source selection, automatic scanning, external API, AI, or LLM behavior
 
-### Version 0.8 (Current, in development)
+### Version 0.8
 
 - Privacy-minimized notification summary contract built from stored reviewed report data
 - Local JSON export through `reports export-notification REPORT_PATH --output OUTPUT_PATH`
@@ -780,6 +813,17 @@ File integrity rules report current observation conditions such as an absent pat
 - Separate notification schema with source-report preservation and alert-report review compatibility
 - Integration, privacy regression, and CI smoke validation coverage
 - No external delivery, network traffic, provider integration, notification config, AI, or LLM behavior
+
+### Version 0.9 (Current, in development)
+
+- Installable Python package metadata with declared runtime and development dependencies
+- Single-source application and package version
+- Packaged default configuration resource independent of the repository working directory
+- Installed `sentinellite` console command with supported `python -m sentinellite` equivalence
+- Side-effect-free `--version` verification
+- Editable-install and wheel resource, metadata, entry-point, and isolated-environment validation
+- MIT License
+- No production deployment, service, external delivery, real AI, or LLM behavior
 
 ### Version 1.0
 
@@ -793,6 +837,10 @@ File integrity rules report current observation conditions such as an absent pat
 SentinelLite AI follows a monitor-first approach.
 
 Version 1 should monitor, alert, report, explain, and recommend. It should not automatically kill processes, block IP addresses, delete files, or modify firewall rules.
+
+## License
+
+SentinelLite AI is available under the [MIT License](LICENSE).
 
 ## Author
 

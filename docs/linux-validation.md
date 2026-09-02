@@ -2,6 +2,10 @@
 
 SentinelLite AI, including baseline-backed file integrity monitoring, was validated successfully in an Ubuntu ARM64 virtual machine. This document records the observed environment, quality checks, CLI status, and scan summaries from that validation run.
 
+## v0.9 Installation Validation Status
+
+Final v0.9 Ubuntu ARM64 validation is pending. The release validation will check editable installation, the `sentinellite` console command, `python -m sentinellite`, side-effect-free version output, and wheel metadata, entry-point, license, and packaged default-config resources. No final v0.9 Linux result or production-readiness claim is made here yet.
+
 ## v0.8 Notification Export Validation Status
 
 The v0.8 local notification summary export validation passed on macOS development, GitHub PR CI, and an Ubuntu ARM64 virtual machine. The Ubuntu validation covered the complete local fixture-to-report-to-notification workflow while preserving the existing alert report and keeping the notification schema separate.

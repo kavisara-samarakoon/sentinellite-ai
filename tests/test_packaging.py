@@ -1,5 +1,5 @@
 import tomllib
-from importlib import resources
+from importlib import metadata, resources
 from pathlib import Path
 
 import pytest
@@ -65,11 +65,31 @@ def test_dev_extra_declares_required_quality_tools() -> None:
     assert {"build", "pytest", "ruff"} <= dev_dependencies
 
 
-def test_empty_license_is_not_declared_as_package_metadata() -> None:
+def test_mit_license_is_declared_and_included_in_installed_wheel() -> None:
     project = load_pyproject()["project"]
+    license_path = PROJECT_ROOT / "LICENSE"
+    license_text = license_path.read_text(encoding="utf-8")
 
-    assert "license" not in project
-    assert (PROJECT_ROOT / "LICENSE").read_bytes() == b""
+    assert license_text
+    assert license_text.startswith("MIT License\n")
+    assert "Copyright (c) 2026 Kavisara Samarakoon" in license_text
+    assert "Permission is hereby granted, free of charge" in license_text
+    assert 'THE SOFTWARE IS PROVIDED "AS IS"' in license_text
+    assert project["license"] == "MIT"
+    assert project["license-files"] == ["LICENSE"]
+
+    distribution = metadata.distribution("sentinellite-ai")
+    assert distribution.metadata["License-Expression"] == "MIT"
+    assert distribution.metadata.get_all("License-File") == ["LICENSE"]
+    distribution_files = distribution.files or []
+    installed_license_paths = [
+        path
+        for path in distribution_files
+        if path.as_posix().endswith(".dist-info/licenses/LICENSE")
+    ]
+    assert len(installed_license_paths) == 1
+    installed_license = distribution.locate_file(installed_license_paths[0])
+    assert installed_license.read_text(encoding="utf-8") == license_text
 
 
 def test_console_script_uses_shared_cli_callable() -> None:
