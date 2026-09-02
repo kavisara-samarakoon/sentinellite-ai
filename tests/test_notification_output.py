@@ -1,3 +1,5 @@
+import ast
+import inspect
 import json
 import os
 import stat
@@ -8,6 +10,7 @@ from pathlib import Path
 
 import pytest
 
+import sentinellite.reporting.notification as notification_module
 from sentinellite.reporting.notification import (
     MAX_INCLUDED_ALERTS,
     NOTIFICATION_OUTPUT_TYPE,
@@ -19,7 +22,13 @@ from sentinellite.reporting.notification import (
     notification_summary_to_dict,
     write_notification_summary,
 )
-from sentinellite.reporting.review import ReviewedAlert, ReviewedReport, validate_report_data
+from sentinellite.reporting.review import (
+    IncompatibleReportError,
+    ReviewedAlert,
+    ReviewedReport,
+    load_review_report,
+    validate_report_data,
+)
 
 EXPECTED_TOP_LEVEL_KEYS = {
     "schema_version",
@@ -430,13 +439,25 @@ def test_written_json_excludes_sensitive_report_and_alert_fields(tmp_path: Path)
                     "severity": "medium",
                     "risk_score": 50,
                     "risk_level": "medium",
-                    "message": "PRIVATE_USER 192.0.2.10 sudo PRIVATE_COMMAND",
+                    "message": (
+                        "PRIVATE_USER 192.0.2.10 /private/message/path "
+                        "sudo PRIVATE_COMMAND --token PRIVATE_TOKEN"
+                    ),
+                    "description": "PRIVATE_DESCRIPTION",
+                    "raw_data": "PRIVATE_RAW_SOURCE_JSON",
                     "evidence": {
+                        "username": "PRIVATE_USER",
+                        "source_ip": "192.0.2.10",
                         "path": "/private/path",
                         "process_name": "PRIVATE_PROCESS",
+                        "cmdline": ["PRIVATE_COMMAND_LINE"],
                         "sha256": "PRIVATE_HASH",
                     },
-                    "explanation": {"summary": "PRIVATE_EXPLANATION"},
+                    "explanation": {
+                        "summary": "PRIVATE_EXPLANATION",
+                        "recommended_actions": ["PRIVATE_RECOMMENDATION"],
+                        "evidence_summary": {"path": "/private/explanation/path"},
+                    },
                 }
             ],
         },
@@ -451,11 +472,18 @@ def test_written_json_excludes_sensitive_report_and_alert_fields(tmp_path: Path)
         "private-source-report.json",
         "PRIVATE_USER",
         "192.0.2.10",
+        "/private/message/path",
         "PRIVATE_COMMAND",
+        "PRIVATE_TOKEN",
+        "PRIVATE_DESCRIPTION",
+        "PRIVATE_RAW_SOURCE_JSON",
         "/private/path",
         "PRIVATE_PROCESS",
+        "PRIVATE_COMMAND_LINE",
         "PRIVATE_HASH",
         "PRIVATE_EXPLANATION",
+        "PRIVATE_RECOMMENDATION",
+        "/private/explanation/path",
         '"message"',
         '"evidence"',
         '"explanation"',
@@ -475,3 +503,48 @@ def test_writer_does_not_modify_source_report_data(tmp_path: Path) -> None:
     )
 
     assert source_path.read_bytes() == source_before
+
+
+def test_notification_json_is_not_a_compatible_sentinellite_alert_report(
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / "notification.json"
+    write_notification_summary(
+        build_notification_summary(reviewed_report((reviewed_alert(),))),
+        output_path,
+    )
+
+    with pytest.raises(IncompatibleReportError, match="supported report_type"):
+        load_review_report(output_path)
+
+
+def test_notification_module_import_boundary_excludes_active_or_external_modules() -> None:
+    syntax_tree = ast.parse(inspect.getsource(notification_module))
+    imported_modules = {
+        alias.name
+        for node in ast.walk(syntax_tree)
+        if isinstance(node, ast.Import)
+        for alias in node.names
+    }
+    imported_modules.update(
+        node.module
+        for node in ast.walk(syntax_tree)
+        if isinstance(node, ast.ImportFrom) and node.module is not None
+    )
+    forbidden_prefixes = (
+        "subprocess",
+        "socket",
+        "urllib",
+        "http",
+        "requests",
+        "sentinellite.collectors",
+        "sentinellite.detection",
+        "sentinellite.scoring",
+        "sentinellite.explanations",
+    )
+
+    assert not any(
+        imported_module == prefix or imported_module.startswith(f"{prefix}.")
+        for imported_module in imported_modules
+        for prefix in forbidden_prefixes
+    )

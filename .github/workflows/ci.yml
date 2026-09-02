@@ -97,6 +97,94 @@ jobs:
           )"
           python -m sentinellite reports show "$ubuntu_report_path"
 
+      - name: Validate v0.8 local notification summary export
+        run: |
+          report_dir=/tmp/sentinellite-v08-report
+          notification_dir=/tmp/sentinellite-v08-notifications
+          notification_path="$notification_dir/alert-summary.json"
+          source_snapshot=/tmp/sentinellite-v08-source-before.bin
+          rm -rf "$report_dir" "$notification_dir"
+          mkdir -p "$notification_dir"
+
+          python -m sentinellite scan-auth examples/auth_logs/sample_ubuntu_auth.log --output-dir "$report_dir"
+          report_path="$(python - "$report_dir" <<'PY'
+          import sys
+          from pathlib import Path
+
+          report_paths = sorted(Path(sys.argv[1]).glob("*.json"))
+          assert len(report_paths) == 1, report_paths
+          print(report_paths[0])
+          PY
+          )"
+
+          python - "$report_path" "$source_snapshot" <<'PY'
+          import sys
+          from pathlib import Path
+
+          report_path = Path(sys.argv[1])
+          snapshot_path = Path(sys.argv[2])
+          assert report_path.is_file()
+          snapshot_path.write_bytes(report_path.read_bytes())
+          PY
+
+          python -m sentinellite reports export-notification "$report_path" --output "$notification_path"
+
+          python - "$report_path" "$notification_path" "$source_snapshot" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          report_path = Path(sys.argv[1])
+          notification_path = Path(sys.argv[2])
+          snapshot_path = Path(sys.argv[3])
+
+          assert report_path.is_file()
+          assert notification_path.is_file()
+          source_bytes = report_path.read_bytes()
+          assert source_bytes == snapshot_path.read_bytes()
+
+          report = json.loads(source_bytes)
+          notification_text = notification_path.read_text(encoding="utf-8")
+          notification = json.loads(notification_text)
+          assert set(report) == {
+              "report_id",
+              "report_type",
+              "generated_at",
+              "alert_count",
+              "alerts",
+          }
+          assert "explanations" not in report
+          assert set(notification) == {
+              "schema_version",
+              "output_type",
+              "source",
+              "alert_count",
+              "included_alert_count",
+              "omitted_alert_count",
+              "severity_counts",
+              "risk_level_counts",
+              "alerts",
+          }
+          assert notification["schema_version"] == 1
+          assert notification["output_type"] == "sentinellite_notification_summary"
+          assert notification["source"] == {
+              "report_id": report["report_id"],
+              "generated_at": report["generated_at"],
+          }
+          assert notification["alert_count"] == 3
+          assert notification["included_alert_count"] == 3
+          assert notification["omitted_alert_count"] == 0
+          assert len(notification["alerts"]) == 3
+          for alert in report["alerts"]:
+              assert alert["message"] not in notification_text
+          assert '"message"' not in notification_text
+          assert '"evidence"' not in notification_text
+          assert '"explanation"' not in notification_text
+          PY
+
+          python -m sentinellite reports list --report-dir "$report_dir"
+          python -m sentinellite reports show "$report_path"
+
       - name: Validate local report review commands
         run: |
           report_dir=/tmp/sentinellite-v06-reports

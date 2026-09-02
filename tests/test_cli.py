@@ -20,6 +20,7 @@ from sentinellite.pipeline.file_integrity_baseline_scan import (
 from sentinellite.pipeline.file_integrity_scan import FileIntegrityScanSummary
 from sentinellite.pipeline.network_scan import NetworkScanSummary
 from sentinellite.pipeline.process_scan import ProcessScanSummary
+from sentinellite.reporting.review import IncompatibleReportError, load_review_report
 from sentinellite.scoring.risk import ScoredAlert
 
 runner = CliRunner()
@@ -2853,8 +2854,14 @@ def test_reports_export_notification_does_not_run_active_processing(
         "sentinellite.main.run_file_integrity_baseline_scan",
         "sentinellite.main.create_file_integrity_baseline",
         "sentinellite.main.generate_alert_explanation",
+        "sentinellite.collectors.auth.collect_auth_events_from_file",
+        "sentinellite.collectors.process.collect_processes",
+        "sentinellite.collectors.network.collect_network_connections",
+        "sentinellite.collectors.file_integrity.collect_file_integrity",
         "sentinellite.detection.engine.detect_events",
         "sentinellite.scoring.risk.score_rule_matches",
+        "sentinellite.explanations.generator.generate_alert_explanation",
+        "sentinellite.explanations.templates.get_explanation_template",
     ):
         monkeypatch.setattr(target, fail_if_called)
 
@@ -2878,6 +2885,7 @@ def test_reports_list_marks_mixed_notification_summary_as_invalid(
 ) -> None:
     report_dir = tmp_path / "mixed-reports"
     report_path = write_review_report(report_dir, filename="alerts.json")
+    source_before = report_path.read_bytes()
     notification_path = report_dir / "notification.json"
 
     export_result = runner.invoke(
@@ -2894,11 +2902,167 @@ def test_reports_list_marks_mixed_notification_summary_as_invalid(
         app,
         ["reports", "list", "--report-dir", str(report_dir)],
     )
+    source_show_result = runner.invoke(
+        app,
+        ["reports", "show", str(report_path)],
+    )
+    notification_show_result = runner.invoke(
+        app,
+        ["reports", "show", str(notification_path)],
+    )
 
     assert export_result.exit_code == 0
     assert list_result.exit_code == 1
+    assert source_show_result.exit_code == 0
+    assert notification_show_result.exit_code == 1
     assert report_path.name in list_result.stdout
     assert notification_path.name in list_result.stdout
     assert "valid" in list_result.stdout
     assert "invalid" in list_result.stdout
     assert "supported report_type" in list_result.stdout
+    assert "supportedreport_type" in "".join(notification_show_result.stdout.split())
+    assert report_path.read_bytes() == source_before
+    assert load_review_report(report_path).alert_count == 1
+    with pytest.raises(IncompatibleReportError, match="supported report_type"):
+        load_review_report(notification_path)
+
+
+@pytest.mark.parametrize(
+    ("fixture_path", "private_values"),
+    [
+        (
+            Path("examples/auth_logs/sample_ubuntu_auth.log"),
+            (
+                "labadmin",
+                "demo-user",
+                "192.0.2.10",
+                "192.0.2.11",
+                "/usr/bin/id",
+                "/home/demo-user",
+            ),
+        ),
+        (
+            Path("examples/auth_logs/sample_rhel_secure.log"),
+            (
+                "audit-user",
+                "ops-user",
+                "198.51.100.20",
+                "203.0.113.21",
+                "/usr/bin/whoami",
+                "/home/ops-user",
+            ),
+        ),
+    ],
+)
+def test_real_auth_fixture_scan_to_notification_export_preserves_report_contract(
+    fixture_path: Path,
+    private_values: tuple[str, ...],
+    tmp_path: Path,
+) -> None:
+    report_dir = tmp_path / "reports"
+    notification_dir = tmp_path / "notifications"
+    notification_dir.mkdir()
+
+    scan_result = runner.invoke(
+        app,
+        ["scan-auth", str(fixture_path), "--output-dir", str(report_dir)],
+        terminal_width=180,
+    )
+    report_paths = sorted(report_dir.glob("*.json"))
+
+    assert scan_result.exit_code == 0
+    assert len(report_paths) == 1
+    report_path = report_paths[0]
+    source_before = report_path.read_bytes()
+    source_data = json.loads(source_before)
+    assert set(source_data) == REPORT_KEYS
+    assert source_data["report_type"] == "sentinellite_alert_report"
+    assert source_data["alert_count"] == 3
+    assert len(source_data["alerts"]) == 3
+    assert "explanations" not in source_data
+
+    notification_path = notification_dir / "alert-summary.json"
+    export_result = runner.invoke(
+        app,
+        [
+            "reports",
+            "export-notification",
+            str(report_path),
+            "--output",
+            str(notification_path),
+        ],
+        terminal_width=180,
+    )
+
+    assert export_result.exit_code == 0
+    assert report_path.read_bytes() == source_before
+    notification_data = json.loads(notification_path.read_text(encoding="utf-8"))
+    assert set(notification_data) == NOTIFICATION_KEYS
+    assert notification_data["schema_version"] == 1
+    assert notification_data["output_type"] == "sentinellite_notification_summary"
+    assert notification_data["source"] == {
+        "report_id": source_data["report_id"],
+        "generated_at": source_data["generated_at"],
+    }
+    assert notification_data["alert_count"] == 3
+    assert notification_data["included_alert_count"] == 3
+    assert notification_data["omitted_alert_count"] == 0
+    assert len(notification_data["alerts"]) == 3
+    assert all(
+        set(notification_alert) == NOTIFICATION_ALERT_KEYS
+        for notification_alert in notification_data["alerts"]
+    )
+
+    notification_text = notification_path.read_text(encoding="utf-8")
+    for source_alert in source_data["alerts"]:
+        assert source_alert["message"] not in notification_text
+        assert source_alert["message"] not in export_result.stdout
+    for private_value in private_values:
+        assert private_value not in notification_text
+        assert private_value not in export_result.stdout
+    for forbidden_field in (
+        '"message"',
+        '"evidence"',
+        '"explanation"',
+        '"description"',
+        '"recommendation"',
+        '"event_id"',
+        '"alert_id"',
+    ):
+        assert forbidden_field not in notification_text
+    assert '"alerts"' not in export_result.stdout
+    assert '"evidence"' not in export_result.stdout
+    assert '"explanation"' not in export_result.stdout
+
+    list_result = runner.invoke(
+        app,
+        ["reports", "list", "--report-dir", str(report_dir)],
+        terminal_width=180,
+    )
+    show_result = runner.invoke(
+        app,
+        ["reports", "show", str(report_path)],
+        terminal_width=180,
+    )
+    notification_show_result = runner.invoke(
+        app,
+        ["reports", "show", str(notification_path)],
+        terminal_width=180,
+    )
+    notification_list_result = runner.invoke(
+        app,
+        ["reports", "list", "--report-dir", str(notification_dir)],
+        terminal_width=180,
+    )
+
+    assert list_result.exit_code == 0
+    assert show_result.exit_code == 0
+    assert notification_show_result.exit_code == 1
+    assert notification_list_result.exit_code == 1
+    assert "valid" in list_result.stdout
+    assert "SentinelLite Alert Report Summary" in show_result.stdout
+    assert "supportedreport_type" in "".join(notification_show_result.stdout.split())
+    assert "invalid" in notification_list_result.stdout
+    assert load_review_report(report_path).alert_count == 3
+    with pytest.raises(IncompatibleReportError, match="supported report_type"):
+        load_review_report(notification_path)
