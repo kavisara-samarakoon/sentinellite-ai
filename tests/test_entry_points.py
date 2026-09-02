@@ -1,3 +1,4 @@
+import json
 import subprocess
 import sys
 import sysconfig
@@ -8,6 +9,7 @@ import pytest
 CONSOLE_SCRIPT = Path(sysconfig.get_path("scripts")) / "sentinellite"
 CONSOLE_COMMAND = (str(CONSOLE_SCRIPT),)
 MODULE_COMMAND = (sys.executable, "-m", "sentinellite")
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 EXPECTED_COMMANDS = {
     "auth-sources",
     "baseline-files",
@@ -18,6 +20,24 @@ EXPECTED_COMMANDS = {
     "scan-files-baseline",
     "scan-network",
     "scan-process",
+}
+REPORT_KEYS = {
+    "report_id",
+    "report_type",
+    "generated_at",
+    "alert_count",
+    "alerts",
+}
+NOTIFICATION_KEYS = {
+    "schema_version",
+    "output_type",
+    "source",
+    "alert_count",
+    "included_alert_count",
+    "omitted_alert_count",
+    "severity_counts",
+    "risk_level_counts",
+    "alerts",
 }
 
 
@@ -84,3 +104,54 @@ def test_entry_points_expose_expected_command_tree(
     assert result.returncode == 0
     for command_name in EXPECTED_COMMANDS:
         assert command_name in result.stdout
+
+
+def test_installed_console_fixture_scan_preserves_separate_schemas(
+    tmp_path: Path,
+) -> None:
+    fixture_path = (
+        PROJECT_ROOT / "examples/auth_logs/sample_ubuntu_auth.log"
+    )
+    report_dir = tmp_path / "reports"
+    notification_dir = tmp_path / "notifications"
+    notification_dir.mkdir()
+    notification_path = notification_dir / "alert-summary.json"
+
+    scan_result = run_entry_point(
+        CONSOLE_COMMAND,
+        "scan-auth",
+        str(fixture_path),
+        "--output-dir",
+        str(report_dir),
+        cwd=tmp_path,
+    )
+
+    assert scan_result.returncode == 0
+    report_paths = sorted(report_dir.glob("*.json"))
+    assert len(report_paths) == 1
+    report_path = report_paths[0]
+    source_bytes = report_path.read_bytes()
+
+    export_result = run_entry_point(
+        CONSOLE_COMMAND,
+        "reports",
+        "export-notification",
+        str(report_path),
+        "--output",
+        str(notification_path),
+        cwd=tmp_path,
+    )
+
+    assert export_result.returncode == 0
+    assert report_path.read_bytes() == source_bytes
+    report = json.loads(source_bytes)
+    notification = json.loads(notification_path.read_text(encoding="utf-8"))
+    assert set(report) == REPORT_KEYS
+    assert report["report_type"] == "sentinellite_alert_report"
+    assert "explanations" not in report
+    assert set(notification) == NOTIFICATION_KEYS
+    assert notification["output_type"] == "sentinellite_notification_summary"
+    assert notification["source"] == {
+        "report_id": report["report_id"],
+        "generated_at": report["generated_at"],
+    }
