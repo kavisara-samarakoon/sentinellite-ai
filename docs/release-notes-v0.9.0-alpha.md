@@ -2,7 +2,7 @@
 
 ## Release Status
 
-`v0.9.0-alpha` is in development until it is formally released. It is not yet published as a GitHub release, and it is not a production EDR release.
+`v0.9.0-alpha` is a published GitHub pre-release alpha milestone for local installation, packaging, and CLI usability readiness. It is not a production EDR release.
 
 ## Release Focus
 
@@ -64,7 +64,7 @@ Final Ubuntu ARM64 validation passed on Linux `aarch64` with Python 3.14.4, Ruff
 
 The available `/var/log/auth.log` was inventoried only; it was not read or scanned. Scan behavior was validated with `examples/auth_logs/sample_ubuntu_auth.log`. The original generated alert report retained exactly `report_id`, `report_type`, `generated_at`, `alert_count`, and `alerts` at the top level, with no top-level `explanations` field. The notification summary retained its independent schema.
 
-These results validate the in-development milestone; they do not claim a published GitHub release or production readiness. Detailed Ubuntu results are recorded in the [Linux ARM64 validation notes](linux-validation.md).
+These results validate the published GitHub pre-release milestone; they do not claim production readiness. Detailed Ubuntu results are recorded in the [Linux ARM64 validation notes](linux-validation.md).
 
 ## Installation and Entry-Point Behavior
 

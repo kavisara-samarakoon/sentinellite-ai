@@ -53,7 +53,7 @@ The wheel build and metadata/resource validation passed. The wheel contained:
 - `sentinellite-ai` package metadata
 - the `sentinellite` console entry point
 
-This validation supports local package and installation readiness only. `v0.9.0-alpha` remains in development and is not a production EDR release. It does not provide real AI or LLM execution, external notification delivery, daemon or background monitoring, or automatic remediation.
+This validation supports local package and installation readiness only. `v0.9.0-alpha` is a published GitHub pre-release alpha milestone and is not a production EDR release. It does not provide real AI or LLM execution, external notification delivery, daemon or background monitoring, or automatic remediation.
 
 ## v0.8 Notification Export Validation Status
 

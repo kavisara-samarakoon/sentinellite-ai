@@ -6,7 +6,7 @@ The project is a Python CLI tool focused on defensive Linux security monitoring.
 
 ## Current Status
 
-Current milestone: `v0.9.0-alpha` (in development; not released)
+Current published milestone: `v0.9.0-alpha` (GitHub pre-release)
 
 The previous `v0.8.0-alpha` local notification summary export milestone is published as a GitHub pre-release.
 
@@ -90,7 +90,7 @@ See the [v0.7.0-alpha release notes](docs/release-notes-v0.7.0-alpha.md) for the
 
 See the [v0.8.0-alpha release notes](docs/release-notes-v0.8.0-alpha.md) for the published local notification summary export milestone.
 
-See the [v0.9.0-alpha release notes](docs/release-notes-v0.9.0-alpha.md) for the current in-development install and package readiness milestone.
+See the [v0.9.0-alpha release notes](docs/release-notes-v0.9.0-alpha.md) for the published install and package readiness milestone.
 
 ## Security Scope
 
@@ -814,7 +814,7 @@ File integrity rules report current observation conditions such as an absent pat
 - Integration, privacy regression, and CI smoke validation coverage
 - No external delivery, network traffic, provider integration, notification config, AI, or LLM behavior
 
-### Version 0.9 (Current, in development)
+### Version 0.9 (Published pre-release)
 
 - Installable Python package metadata with declared runtime and development dependencies
 - Single-source application and package version
