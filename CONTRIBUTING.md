@@ -1,34 +1,43 @@
 # Contributing to SentinelLite AI
 
-Thank you for your interest in SentinelLite AI.
+SentinelLite AI welcomes focused contributions that preserve its defensive, local, and investigation-oriented scope.
 
-This project is currently in early development. Contributions should stay defensive, ethical, and educational.
+## Setup
 
-## Contribution Rules
+From a cloned repository, create an isolated environment and install the development tools:
 
-- Keep the project defensive.
-- Do not add offensive payloads or harmful automation.
-- Keep code readable and documented.
-- Do not commit secrets or real logs.
-- Add tests for new logic where possible.
-- Explain security-related features clearly.
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+```
 
-## Development Workflow
+## Validation
 
-Recommended workflow:
+Run the checks relevant to the change, and run the full set before opening a pull request:
 
-1. Create an issue.
-2. Create a feature branch.
-3. Make changes.
-4. Test locally.
-5. Submit a pull request.
+```bash
+python -m pip check
+ruff check --no-cache src tests
+PYTHONDONTWRITEBYTECODE=1 pytest -p no:cacheprovider
+python -m build --wheel
+sentinellite --version
+python -m sentinellite --version
+```
 
-## Code Quality Tools
+Remove generated `dist/`, `build/`, and `src/sentinellite_ai.egg-info/` directories after local wheel validation. Do not commit build products, generated reports or notification summaries, caches, secrets, or real host logs.
 
-Planned tools:
+## Branches and Commits
 
-- pytest
-- ruff
-- mypy
-- bandit
-- pip-audit
+- Use a focused feature or fix branch.
+- Keep commits small enough to review and describe their intent clearly.
+- Add focused tests for behavior changes and preserve backward-compatible CLI and data contracts.
+- Submit a pull request only after reviewing the diff and running the applicable validation.
+
+## Safety Boundaries
+
+- Keep features defensive and limited to authorized endpoint observation and local review.
+- Do not add offensive tooling, exploitation, port scanning, packet sending, external notification delivery, or secret/provider integrations.
+- Do not add real AI or LLM execution, automatic remediation, process termination, IP blocking, firewall changes, or file deletion and repair.
+- Do not describe SentinelLite AI as a production EDR or claim that investigation signals prove compromise or malware.

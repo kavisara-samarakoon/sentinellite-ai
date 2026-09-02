@@ -9,6 +9,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from sentinellite import __version__
 from sentinellite.collectors.auth_sources import (
     DEFAULT_AUTH_LOG_CANDIDATES,
     AuthLogSourceError,
@@ -43,7 +44,7 @@ from sentinellite.reporting.review import (
 )
 
 console = Console()
-CURRENT_VERSION = "0.8.0-alpha"
+CURRENT_VERSION = __version__
 
 app = typer.Typer(
     help="SentinelLite AI - Lightweight Linux endpoint detection and monitoring agent.",
@@ -291,7 +292,19 @@ def main(
             help="Load settings from this SentinelLite TOML configuration file.",
         ),
     ] = None,
+    version: Annotated[
+        bool,
+        typer.Option(
+            "--version",
+            help="Show the SentinelLite AI version and exit.",
+            is_eager=True,
+        ),
+    ] = False,
 ) -> None:
+    if version:
+        typer.echo(f"SentinelLite AI v{__version__}")
+        raise typer.Exit()
+
     try:
         ctx.obj = default_config() if config_path is None else load_config(config_path)
     except ConfigError as error:
@@ -1019,5 +1032,10 @@ def scan_files_baseline_command(
         console.print("[green][+] No baseline file integrity alerts generated.[/green]")
 
 
-if __name__ == "__main__":
+def cli() -> None:
+    """Run the SentinelLite AI command-line application."""
     app()
+
+
+if __name__ == "__main__":
+    cli()

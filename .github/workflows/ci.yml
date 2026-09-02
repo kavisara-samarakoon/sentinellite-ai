@@ -11,11 +11,10 @@ on:
 
 jobs:
   test:
-    name: Ruff and Pytest
+    name: Packaging, Ruff, and Pytest
     runs-on: ubuntu-latest
 
     env:
-      PYTHONPATH: src
       PYTHONDONTWRITEBYTECODE: "1"
 
     steps:
@@ -30,17 +29,85 @@ jobs:
       - name: Upgrade pip
         run: python -m pip install --upgrade pip
 
-      - name: Install dependencies
-        run: python -m pip install -r requirements.txt
+      - name: Install project and development dependencies
+        run: python -m pip install -e ".[dev]"
+
+      - name: Check installed dependencies
+        run: python -m pip check
 
       - name: Run Ruff
-        run: ruff check src tests
+        run: ruff check --no-cache src tests
 
       - name: Run Pytest
-        run: pytest -p no:cacheprovider
+        run: PYTHONDONTWRITEBYTECODE=1 pytest -p no:cacheprovider
 
-      - name: Run CLI status smoke test
-        run: python -m sentinellite
+      - name: Build wheel
+        run: python -m build --wheel
+
+      - name: Validate wheel contents and metadata
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          wheels = sorted(Path("dist").glob("*.whl"))
+          assert len(wheels) == 1, wheels
+          wheel = wheels[0]
+
+          with ZipFile(wheel) as wheel_file:
+              names = set(wheel_file.namelist())
+              assert any(
+                  name.startswith("sentinellite/") and name.endswith(".py")
+                  for name in names
+              )
+              assert "sentinellite/config/default.yaml" in names
+              metadata_names = sorted(
+                  name for name in names if name.endswith(".dist-info/METADATA")
+              )
+              entry_point_names = sorted(
+                  name
+                  for name in names
+                  if name.endswith(".dist-info/entry_points.txt")
+              )
+              assert len(metadata_names) == 1, metadata_names
+              assert len(entry_point_names) == 1, entry_point_names
+              metadata = wheel_file.read(metadata_names[0]).decode("utf-8")
+              entry_points = wheel_file.read(entry_point_names[0]).decode("utf-8")
+              assert "Name: sentinellite-ai" in metadata
+              assert "Version: 0.9.0a0" in metadata
+              assert "sentinellite = sentinellite.main:cli" in entry_points
+
+          print("WHEEL_METADATA_SMOKE: PASSED")
+          PY
+
+      - name: Validate wheel in an isolated environment
+        run: |
+          wheel_path="$(python - <<'PY'
+          from pathlib import Path
+
+          wheels = sorted(Path("dist").glob("*.whl"))
+          assert len(wheels) == 1, wheels
+          print(wheels[0].resolve())
+          PY
+          )"
+          wheel_environment=/tmp/sentinellite-v09-wheel-environment
+          rm -rf "$wheel_environment"
+          python -m venv "$wheel_environment"
+          "$wheel_environment/bin/python" -m pip install "$wheel_path"
+
+          cd /tmp
+          "$wheel_environment/bin/sentinellite" --version
+          "$wheel_environment/bin/python" -m sentinellite --version
+          "$wheel_environment/bin/sentinellite"
+
+      - name: Validate installed entry points
+        run: |
+          sentinellite --version
+          python -m sentinellite --version
+
+          cd /tmp
+          sentinellite
+          python -m sentinellite
 
       - name: Create and use default TOML config
         run: |
@@ -50,7 +117,9 @@ jobs:
 
       - name: Run authentication scan smoke test
         run: |
-          python -m sentinellite scan-auth examples/auth_logs/sample_auth.log | tee /tmp/sentinellite-auth-smoke.txt
+          console_report_dir=/tmp/sentinellite-v09-console-auth
+          rm -rf "$console_report_dir"
+          sentinellite scan-auth examples/auth_logs/sample_auth.log --output-dir "$console_report_dir" | tee /tmp/sentinellite-auth-smoke.txt
           grep -Fq "Deterministic Alert Explanations" /tmp/sentinellite-auth-smoke.txt
 
       - name: Validate Linux authentication log fixture compatibility

@@ -1091,7 +1091,7 @@ def test_default_status_describes_implemented_and_planned_modules() -> None:
     result = runner.invoke(app)
 
     assert result.exit_code == 0
-    assert "SentinelLite AI v0.8.0-alpha" in result.stdout
+    assert "SentinelLite AI v0.9.0-alpha" in result.stdout
     assert "│ Authentication Monitor  │ Enabled │" in result.stdout
     assert "│ Process Monitor         │ Enabled │" in result.stdout
     assert "│ Network Monitor         │ Enabled │" in result.stdout
@@ -1101,6 +1101,23 @@ def test_default_status_describes_implemented_and_planned_modules() -> None:
     assert "Monitor active network connections and" in result.stdout
     assert "Observe selected file paths for" in result.stdout
     assert "Not implemented; planned for a future" not in result.stdout
+
+
+def test_version_option_exits_before_config_or_system_collection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_if_called(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("version option performed status work")
+
+    monkeypatch.setattr("sentinellite.main.default_config", fail_if_called)
+    monkeypatch.setattr("sentinellite.main.load_config", fail_if_called)
+    monkeypatch.setattr("sentinellite.main.collect_system_info", fail_if_called)
+
+    result = runner.invoke(app, ["--version"])
+
+    assert result.exit_code == 0
+    assert result.stdout == "SentinelLite AI v0.9.0-alpha\n"
+    assert result.stderr == ""
 
 
 def test_scan_process_command_displays_summary_and_alerts(

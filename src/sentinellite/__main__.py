@@ -1,4 +1,4 @@
-from sentinellite.main import app
+from sentinellite.main import cli
 
 if __name__ == "__main__":
-    app()
+    cli()
