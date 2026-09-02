@@ -17,8 +17,10 @@ dist/
 # Logs and reports
 logs/*
 reports/*
+notifications/*
 !logs/.gitkeep
 !reports/.gitkeep
+!notifications/.gitkeep
 *.log
 
 # Local databases

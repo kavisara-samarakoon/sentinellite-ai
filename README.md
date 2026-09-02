@@ -6,9 +6,9 @@ The project is a Python CLI tool focused on defensive Linux security monitoring.
 
 ## Current Status
 
-Current milestone: `v0.7.0-alpha` (in development; not released)
+Current milestone: `v0.8.0-alpha` (in development; not released)
 
-The previous `v0.6.0-alpha` local report review milestone is published as a GitHub pre-release.
+The previous `v0.7.0-alpha` Linux authentication log source compatibility milestone is published as a GitHub pre-release.
 
 Current milestone status:
 
@@ -54,11 +54,15 @@ Current milestone status:
 - Default JSON alert reports retain the existing five-field top-level structure
 - Read-only local report discovery and validation implemented
 - `reports list` and `reports show REPORT_PATH` commands implemented
+- Privacy-minimized notification summary contract and deterministic builder implemented
+- Safe local JSON notification summary writer implemented with overwrite refusal
+- `reports export-notification REPORT_PATH --output OUTPUT_PATH` command implemented
+- Notification export integration, privacy regression, and CI smoke coverage implemented
 - Read-only discovery and validation of common Linux authentication log candidates implemented
 - `auth-sources list` inventory command implemented without automatic scanning
 - Clean authentication source errors for missing, unreadable, malformed, and unsupported paths
 - Representative Ubuntu/Debian-style and RHEL/Fedora-style text fixtures implemented
-- 531 automated tests passing
+- 568 automated tests passing
 
 Baseline-backed file integrity monitoring is implemented and has been validated on Ubuntu ARM64. See the [Linux ARM64 validation notes](docs/linux-validation.md).
 
@@ -76,7 +80,9 @@ See the [v0.5.0-alpha release notes](docs/release-notes-v0.5.0-alpha.md) for the
 
 See the [v0.6.0-alpha release notes](docs/release-notes-v0.6.0-alpha.md) for the published local report review milestone.
 
-See the [v0.7.0-alpha release notes](docs/release-notes-v0.7.0-alpha.md) for the current Linux authentication log source compatibility milestone.
+See the [v0.7.0-alpha release notes](docs/release-notes-v0.7.0-alpha.md) for the published Linux authentication log source compatibility milestone.
+
+See the [v0.8.0-alpha release notes](docs/release-notes-v0.8.0-alpha.md) for the current in-development local notification summary export milestone.
 
 ## Security Scope
 
@@ -94,6 +100,7 @@ It is intended for:
 - defensive alerting
 - SOC-style investigation practice
 - structured JSON reporting
+- local, privacy-minimized notification summary export
 - local, deterministic, rule-based investigation guidance
 - planned AI-assisted defensive explanation
 
@@ -118,6 +125,9 @@ It is not intended for:
 - `scan-files-baseline` writes only its JSON alert report.
 - `reports list` and `reports show` read existing local reports without modifying them.
 - Report review does not call an AI model, LLM, external API, or explanation service.
+- `reports export-notification` reads only an explicitly selected existing report and writes a separate local JSON summary. It does not collect events, run detection, rescore alerts, regenerate explanations, or send data.
+- Notification export makes no network requests or external API calls and provides no email, Slack, Discord, webhook, SMS, provider, token, AI, or LLM behavior.
+- Notification export has no configuration settings and does not change the source report or the existing alert-report JSON schema.
 - `auth-sources list` performs local, read-only inventory and does not scan log contents or start `scan-auth`.
 - Authentication scanning requires an explicit `scan-auth LOG_PATH`; candidate discovery never selects a source automatically.
 - SentinelLite AI does not invoke `sudo` or modify log permissions or ownership.
@@ -162,6 +172,9 @@ It is not intended for:
 - Optional nested JSON alert explanations requested with `--include-explanations`
 - Read-only discovery and validation of existing local JSON alert reports
 - Report directory listing and exact-path report summaries
+- Privacy-minimized notification summary schema and deterministic builder
+- Safe, exclusive local JSON notification summary writing
+- Exact-path notification export through `reports export-notification`
 - Read-only inventory of common Linux authentication log candidates
 - Explicit authentication log selection with clean source validation errors
 - Representative traditional Ubuntu/Debian-style and RHEL/Fedora-style fixture coverage
@@ -579,9 +592,44 @@ Both review commands are local and read-only. They do not write reports, change 
 
 Malformed and incompatible reports fail with concise diagnostics and no raw-content dump. `reports list` keeps valid and invalid entries visible together, then exits non-zero when a directory contains invalid JSON report candidates. Report filters are not included in v0.6.
 
+### Exporting Local Notification Summaries
+
+Create the output directory, then export a privacy-minimized summary from one explicitly selected existing report:
+
+```bash
+mkdir -p notifications
+python -m sentinellite reports export-notification REPORT_PATH --output notifications/alert-summary.json
+```
+
+The output parent directory must already exist, and the output file must not already exist. The command writes JSON only, refuses to overwrite an existing target, and leaves the source report unchanged. Use `notifications/` for these generated artifacts. Do not place notification summaries inside `reports/`: `reports list` treats lowercase `.json` files there as alert-report candidates, and the separate notification schema is intentionally reported as incompatible.
+
+The notification summary includes only:
+
+- `schema_version`
+- `output_type`
+- `source.report_id`
+- `source.generated_at`
+- total, included, and omitted alert counts
+- severity counts
+- risk-level counts
+- per-alert `rule_id`, `category`, `severity`, stored `risk_score`, and stored `risk_level`
+
+It excludes:
+
+- alert messages and evidence
+- explanation bodies and recommendations
+- usernames and IP addresses
+- file paths, process names, and command lines
+- hashes
+- raw source report JSON
+
+The notification JSON is a separate output contract, not a SentinelLite alert report. Export does not add fields to the source report, and the established alert-report schema remains unchanged. It uses stored reviewed report data only: it does not collect, detect, rescore, regenerate explanations, or inspect explanation templates.
+
+This is local export only. v0.8 implements no external delivery, network traffic, notification configuration, email, Slack, Discord, webhook, SMS, provider, token, AI, or LLM behavior. Although privacy-minimized, notification summaries can still reveal operational security metadata and should be handled as sensitive artifacts.
+
 ## Testing
 
-The current test suite contains 531 tests covering configuration, collectors, authentication source discovery, Linux text fixtures, baseline models and persistence, normalization, detection, scoring, reporting, deterministic explanations, report review, pipelines, and CLI behavior.
+The current test suite contains 568 tests covering configuration, collectors, authentication source discovery, Linux text fixtures, baseline models and persistence, normalization, detection, scoring, reporting, deterministic explanations, report review, notification export, privacy regression, pipelines, and CLI behavior.
 
 Run all tests:
 
@@ -592,14 +640,14 @@ pytest
 Run lint checks:
 
 ```bash
-ruff check src tests
+ruff check --no-cache src tests
 ```
 
 Recommended full local check:
 
 ```bash
-ruff check src tests
-pytest
+ruff check --no-cache src tests
+pytest -p no:cacheprovider
 python -m sentinellite
 python -m sentinellite auth-sources list
 python -m sentinellite config-init --path /tmp/sentinellite-v07.toml
@@ -610,6 +658,8 @@ python -m sentinellite scan-auth examples/auth_logs/sample_rhel_secure.log
 python -m sentinellite scan-auth examples/auth_logs/sample_auth.log --include-explanations
 python -m sentinellite reports list
 python -m sentinellite reports show reports/alerts-....json
+mkdir -p notifications
+python -m sentinellite reports export-notification reports/alerts-....json --output notifications/alert-summary.json
 python -m sentinellite scan-process
 python -m sentinellite scan-network
 python -m sentinellite scan-files README.md
@@ -721,6 +771,15 @@ File integrity rules report current observation conditions such as an absent pat
 - Representative Ubuntu/Debian-style and RHEL/Fedora-style traditional text fixtures
 - JSON report and v0.6 report review compatibility validation
 - No journald, compressed rotation, config source selection, automatic scanning, external API, AI, or LLM behavior
+
+### Version 0.8 (Current, in development)
+
+- Privacy-minimized notification summary contract built from stored reviewed report data
+- Local JSON export through `reports export-notification REPORT_PATH --output OUTPUT_PATH`
+- Exclusive output creation, overwrite refusal, and owner-only POSIX permissions where supported
+- Separate notification schema with source-report preservation and alert-report review compatibility
+- Integration, privacy regression, and CI smoke validation coverage
+- No external delivery, network traffic, provider integration, notification config, AI, or LLM behavior
 
 ### Version 1.0
 
