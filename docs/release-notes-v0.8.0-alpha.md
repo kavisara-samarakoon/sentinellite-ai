@@ -2,7 +2,7 @@
 
 ## Release Status
 
-v0.8.0-alpha is an in-development alpha milestone until it is formally released. It is intended for controlled demonstration, authorized defensive security learning, and portfolio review. It is not a published release or a production EDR claim.
+`v0.8.0-alpha` is a published GitHub pre-release alpha milestone. It is intended for controlled demonstration, authorized defensive security learning, and portfolio review. It is not presented as a production EDR release.
 
 ## Release Focus
 
@@ -40,7 +40,7 @@ This milestone adds local, privacy-minimized notification summary export from an
 - The source alert report retained exactly the five established top-level fields: `report_id`, `report_type`, `generated_at`, `alert_count`, and `alerts`. No top-level `explanations` field was added.
 - Report review accepted the original generated alert report after notification export.
 - The Ubuntu worktree was clean after validation.
-- Publication as a GitHub release or pre-release is not claimed.
+- Published as a GitHub pre-release.
 
 ## Safety Scope
 
