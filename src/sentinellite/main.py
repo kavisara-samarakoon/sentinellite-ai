@@ -9,6 +9,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from sentinellite import __version__
 from sentinellite.collectors.auth_sources import (
     DEFAULT_AUTH_LOG_CANDIDATES,
     AuthLogSourceError,
@@ -43,7 +44,7 @@ from sentinellite.reporting.review import (
 )
 
 console = Console()
-CURRENT_VERSION = "0.8.0-alpha"
+CURRENT_VERSION = __version__
 
 app = typer.Typer(
     help="SentinelLite AI - Lightweight Linux endpoint detection and monitoring agent.",

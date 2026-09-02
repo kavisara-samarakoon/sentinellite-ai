@@ -1,0 +1,36 @@
+app:
+  name: "SentinelLite AI"
+  environment: "development"
+
+monitoring:
+  authentication:
+    enabled: true
+    description: "Monitor Linux authentication logs and SSH login activity"
+
+  process:
+    enabled: true
+    description: "Monitor running processes and suspicious process activity"
+
+  network:
+    enabled: true
+    description: "Monitor network connections and open ports"
+
+  file_integrity:
+    enabled: true
+    description: "Monitor selected critical files for changes"
+
+reporting:
+  json_reports:
+    enabled: true
+    output_dir: "reports"
+
+ai_analysis:
+  enabled: false
+  provider: "none"
+  note: "AI analysis will be added after the detection and reporting pipeline is stable"
+
+risk:
+  low: 25
+  medium: 50
+  high: 75
+  critical: 90

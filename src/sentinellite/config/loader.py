@@ -1,5 +1,6 @@
 import tomllib
 from collections.abc import Mapping
+from importlib.resources import files
 from pathlib import Path
 from typing import Any, overload
 
@@ -13,7 +14,7 @@ from sentinellite.config.models import (
 )
 from sentinellite.detection.rules import DEFAULT_RULES
 
-DEFAULT_CONFIG_PATH = Path("config/default.yaml")
+DEFAULT_CONFIG_RESOURCE = "default.yaml"
 
 _TOP_LEVEL_KEYS = frozenset({"config_version", "reporting", "modules", "rules"})
 _REPORTING_KEYS = frozenset({"output_dir", "include_explanations"})
@@ -119,7 +120,7 @@ def load_config(
 ) -> SentinelLiteConfig | dict[str, Any]:
     """Load typed TOML, preserving the existing no-argument YAML call for the CLI."""
     if config_path is None:
-        return _load_legacy_config(DEFAULT_CONFIG_PATH)
+        return _load_packaged_default_config()
 
     path = Path(config_path)
     try:
@@ -176,16 +177,20 @@ def _parse_disabled_rule_ids(value: object) -> tuple[str, ...]:
     return disabled_ids
 
 
-def _load_legacy_config(config_path: Path) -> dict[str, Any]:
-    """Load the legacy YAML used by the current, not-yet-config-aware CLI."""
-    if not config_path.exists():
-        raise ConfigError(f"Config file not found: {config_path}")
-
+def _load_packaged_default_config() -> dict[str, Any]:
+    """Load the legacy status configuration from the installed package."""
     try:
-        with config_path.open("r", encoding="utf-8") as file:
+        config_resource = files("sentinellite.config").joinpath(
+            DEFAULT_CONFIG_RESOURCE
+        )
+        with config_resource.open("r", encoding="utf-8") as file:
             config = yaml.safe_load(file)
     except yaml.YAMLError as error:
-        raise ConfigError(f"Invalid YAML config file: {error}") from error
+        raise ConfigError(f"Invalid packaged default config: {error}") from error
+    except OSError as error:
+        raise ConfigError(
+            f"Could not read packaged default config: {error}"
+        ) from error
 
     if not isinstance(config, dict):
         raise ConfigError("Config file must contain a YAML object at the top level.")
