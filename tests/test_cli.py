@@ -1103,6 +1103,23 @@ def test_default_status_describes_implemented_and_planned_modules() -> None:
     assert "Not implemented; planned for a future" not in result.stdout
 
 
+def test_version_option_exits_before_config_or_system_collection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_if_called(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("version option performed status work")
+
+    monkeypatch.setattr("sentinellite.main.default_config", fail_if_called)
+    monkeypatch.setattr("sentinellite.main.load_config", fail_if_called)
+    monkeypatch.setattr("sentinellite.main.collect_system_info", fail_if_called)
+
+    result = runner.invoke(app, ["--version"])
+
+    assert result.exit_code == 0
+    assert result.stdout == "SentinelLite AI v0.9.0-alpha\n"
+    assert result.stderr == ""
+
+
 def test_scan_process_command_displays_summary_and_alerts(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

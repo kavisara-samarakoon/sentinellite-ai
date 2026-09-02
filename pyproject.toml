@@ -18,6 +18,9 @@ dependencies = [
     "typer",
 ]
 
+[project.scripts]
+sentinellite = "sentinellite.main:cli"
+
 [project.optional-dependencies]
 dev = [
     "bandit",

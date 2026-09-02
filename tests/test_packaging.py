@@ -72,10 +72,12 @@ def test_empty_license_is_not_declared_as_package_metadata() -> None:
     assert (PROJECT_ROOT / "LICENSE").read_bytes() == b""
 
 
-def test_console_script_is_not_declared_in_m2() -> None:
+def test_console_script_uses_shared_cli_callable() -> None:
     project = load_pyproject()["project"]
 
-    assert "scripts" not in project
+    assert project["scripts"] == {
+        "sentinellite": "sentinellite.main:cli"
+    }
 
 
 def test_requirements_file_delegates_to_dev_extra() -> None:

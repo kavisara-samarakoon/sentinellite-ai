@@ -292,7 +292,19 @@ def main(
             help="Load settings from this SentinelLite TOML configuration file.",
         ),
     ] = None,
+    version: Annotated[
+        bool,
+        typer.Option(
+            "--version",
+            help="Show the SentinelLite AI version and exit.",
+            is_eager=True,
+        ),
+    ] = False,
 ) -> None:
+    if version:
+        typer.echo(f"SentinelLite AI v{__version__}")
+        raise typer.Exit()
+
     try:
         ctx.obj = default_config() if config_path is None else load_config(config_path)
     except ConfigError as error:
@@ -1020,5 +1032,10 @@ def scan_files_baseline_command(
         console.print("[green][+] No baseline file integrity alerts generated.[/green]")
 
 
-if __name__ == "__main__":
+def cli() -> None:
+    """Run the SentinelLite AI command-line application."""
     app()
+
+
+if __name__ == "__main__":
+    cli()
