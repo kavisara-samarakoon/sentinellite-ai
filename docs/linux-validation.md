@@ -2,6 +2,58 @@
 
 SentinelLite AI, including baseline-backed file integrity monitoring, was validated successfully in an Ubuntu ARM64 virtual machine. This document records the observed environment, quality checks, CLI status, and scan summaries from that validation run.
 
+## v0.8 Notification Export Validation Status
+
+The v0.8 local notification summary export validation passed on macOS development, GitHub PR CI, and an Ubuntu ARM64 virtual machine. The Ubuntu validation covered the complete local fixture-to-report-to-notification workflow while preserving the existing alert report and keeping the notification schema separate.
+
+Current v0.8 status:
+
+- GitHub PR #7 CI: passed for both `push` and `pull_request`
+- macOS development validation: passed
+- Ubuntu ARM64 validation: passed
+- Local notification export smoke: passed
+- Existing alert-report compatibility and report review: passed
+- Notification schema and privacy compatibility: passed
+
+### v0.8 Ubuntu ARM64 Results
+
+| Field | Observed Value |
+|---|---|
+| Operating system | Linux |
+| Architecture | `aarch64` |
+| Python version | `3.14.4` |
+| Ruff | Passed |
+| Pytest | 568 passed |
+| CLI version | `SentinelLite AI v0.8.0-alpha` |
+| Notification smoke | Passed |
+| Working tree after validation | Clean |
+
+The bundled Ubuntu/Debian-style authentication fixture produced 3 authentication events and 3 alerts. Exporting its generated report produced a local notification summary with 3 included alerts and 0 omitted alerts.
+
+The original SentinelLite alert report remained compatible with the established five-field top-level schema:
+
+- `report_id`
+- `report_type`
+- `generated_at`
+- `alert_count`
+- `alerts`
+
+No top-level `explanations` field was added. `reports list` and `reports show` continued to accept and display the original generated report after notification export.
+
+The notification artifact passed validation against its separate schema, including `schema_version`, `output_type`, source metadata, alert counts, severity counts, risk-level counts, and privacy-minimized alert entries. It was not treated as a SentinelLite alert report.
+
+Privacy validation confirmed that these sensitive fixture values were not copied into the notification JSON:
+
+- `labadmin`
+- `demo-user`
+- `192.0.2.10`
+- `192.0.2.11`
+- `/usr/bin/id`
+- `Failed SSH login attempt`
+- `Successful SSH login`
+
+The Ubuntu worktree ended clean. This validation covers local notification summary export only. It does not claim production readiness, external notification delivery, or email, Slack, Discord, webhook, or SMS integration.
+
 ## v0.7 Authentication Source Compatibility Validation Status
 
 The v0.7 validation passed on macOS development, GitHub CI, and an Ubuntu ARM64 virtual machine. Its authentication scan checks used representative traditional text fixtures and are intentionally separated from both real host-log scanning and the earlier Ubuntu ARM64 runtime record below.

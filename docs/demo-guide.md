@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This guide provides a safe, professional flow for demonstrating the SentinelLite AI `v0.7.0-alpha` in-development milestone. The demonstration focuses on explicit local TOML configuration, Linux authentication log source compatibility, implemented defensive monitoring, transparent detection results, local deterministic alert explanations, optional JSON explanation export, read-only local report review, and the project's current limitations.
+This guide provides a safe, professional flow for demonstrating the SentinelLite AI `v0.8.0-alpha` in-development milestone. The demonstration focuses on explicit local TOML configuration, Linux authentication log source compatibility, implemented defensive monitoring, transparent detection results, local deterministic alert explanations, optional JSON explanation export, read-only local report review, privacy-minimized local notification summary export, and the project's current limitations.
 
 ## Demo Environment
 
@@ -333,6 +333,72 @@ python -m sentinellite reports show "$REPORT_PATH"
 
 The review commands read only local report files and do not modify them. `reports show` prints a normalized summary and compact alert fields without evidence or raw JSON by default. It displays only whether a stored explanation object is present; it does not print the explanation body or regenerate an explanation from current templates.
 
+## Local Notification Summary Export Demo
+
+Generate one report from the bundled Ubuntu-style fixture and prepare a separate output directory:
+
+```bash
+rm -rf /tmp/sentinellite-v08-report /tmp/sentinellite-v08-notifications
+mkdir -p /tmp/sentinellite-v08-notifications
+python -m sentinellite scan-auth examples/auth_logs/sample_ubuntu_auth.log --output-dir /tmp/sentinellite-v08-report
+```
+
+Resolve the exact generated report path:
+
+```bash
+REPORT_PATH="$(python - <<'PY'
+from pathlib import Path
+
+reports = sorted(Path("/tmp/sentinellite-v08-report").glob("*.json"))
+assert len(reports) == 1, reports
+print(reports[0])
+PY
+)"
+```
+
+Export the separate notification summary:
+
+```bash
+python -m sentinellite reports export-notification "$REPORT_PATH" --output /tmp/sentinellite-v08-notifications/alert-summary.json
+```
+
+Review the original alert report after export:
+
+```bash
+python -m sentinellite reports list --report-dir /tmp/sentinellite-v08-report
+python -m sentinellite reports show "$REPORT_PATH"
+```
+
+Inspect the notification summary with the Python standard library:
+
+```bash
+python - <<'PY'
+import json
+from pathlib import Path
+
+path = Path("/tmp/sentinellite-v08-notifications/alert-summary.json")
+summary = json.loads(path.read_text(encoding="utf-8"))
+expected_keys = {
+    "schema_version",
+    "output_type",
+    "source",
+    "alert_count",
+    "included_alert_count",
+    "omitted_alert_count",
+    "severity_counts",
+    "risk_level_counts",
+    "alerts",
+}
+assert set(summary) == expected_keys
+assert summary["output_type"] == "sentinellite_notification_summary"
+print(json.dumps(summary, indent=2, sort_keys=True))
+PY
+```
+
+The exporter reads only the explicitly selected existing report and uses its stored reviewed data. It does not collect events, run detection, rescore alerts, regenerate explanations, or send anything. The output is local JSON only, and the source report remains unchanged.
+
+Keep notification summaries in a separate location such as `/tmp/sentinellite-v08-notifications` or `notifications/`. Do not place them in `reports/`: `reports list` treats lowercase `.json` files as alert-report candidates, while notification summaries intentionally use an independent schema.
+
 ## Safe Demo Notes
 
 - SentinelLite AI is a defensive-only project.
@@ -346,6 +412,9 @@ The review commands read only local report files and do not modify them. `report
 - Report listing and review are local and read-only.
 - Report review does not print evidence or raw JSON by default.
 - Stored explanations are not regenerated during report review.
+- Notification export is local only, uses stored reviewed report data, and leaves the source report unchanged.
+- Notification summaries are privacy-minimized but remain sensitive operational artifacts.
+- Notification export performs no external delivery, network traffic, external API calls, real AI, or LLM execution.
 - Alerts are investigation-focused and do not claim malware classification.
 - Deterministic explanations are local rule templates and do not call an AI model, LLM, or API.
 - AI-assisted alert explanation is planned but is not implemented yet.
@@ -361,15 +430,16 @@ Only demonstrate the project on systems and data that you are authorized to obse
 5. Run `auth-sources list` and explain inventory-only behavior.
 6. Scan both bundled Linux authentication text fixtures with explicit paths.
 7. Review a fixture report with `reports list` and `reports show`.
-8. Run the authentication scan with explicit `--config` selection.
-9. Demonstrate configured reporting, rule disabling, and module gating.
-10. Run the process scan.
-11. Run the network observation scan.
-12. Run the file integrity observation scan.
-13. Create and scan a file integrity baseline.
-14. Review deterministic explanation panels when a scan produces alerts.
-15. Compare default and opt-in JSON reports and show the nested per-alert explanation.
-16. Explain the current limitations and next roadmap items.
+8. Export a privacy-minimized notification summary into a separate notification directory.
+9. Run the authentication scan with explicit `--config` selection.
+10. Demonstrate configured reporting, rule disabling, and module gating.
+11. Run the process scan.
+12. Run the network observation scan.
+13. Run the file integrity observation scan.
+14. Create and scan a file integrity baseline.
+15. Review deterministic explanation panels when a scan produces alerts.
+16. Compare default and opt-in JSON reports and show the nested per-alert explanation.
+17. Explain the current limitations and next roadmap items.
 
 ## Current Limitations
 
@@ -381,5 +451,10 @@ Only demonstrate the project on systems and data that you are authorized to obse
 - Journald and compressed rotated authentication logs are not supported in v0.7.
 - Candidate file availability under `/var/log` is system-dependent.
 - JSON explanation export requires `--include-explanations` or `reporting.include_explanations = true` in an explicitly selected config.
+- Notification export is JSON only and has no notification configuration settings.
+- The notification output parent directory must exist, and the output file must not already exist.
+- Notification summaries should not be placed in `reports/` because they are not alert reports.
+- Email, Slack, Discord, webhook, SMS, and other provider delivery integrations are not implemented.
+- Notification export sends no network traffic and uses no tokens or external APIs.
 - AI-assisted explanation is not implemented yet.
 - The project has a Linux-first design; macOS is supported as a development mode.
