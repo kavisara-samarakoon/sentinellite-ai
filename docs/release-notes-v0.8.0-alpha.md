@@ -29,10 +29,17 @@ This milestone adds local, privacy-minimized notification summary export from an
 
 ## Validation
 
-- Automated Ruff, Pytest, CLI, notification schema, privacy regression, source-report preservation, report review compatibility, and CI smoke validation is defined.
-- macOS development validation: pending
-- Ubuntu ARM64 validation: pending
-- GitHub CI results are not claimed until the workflow has actually run on a pull request.
+- GitHub PR #7 CI passed for both `push` and `pull_request` workflows.
+- macOS development validation: passed
+- Ubuntu ARM64 validation: passed on Linux `aarch64` with Python 3.14.4
+- Ruff passed, and Pytest passed with 568 tests.
+- The CLI displayed `SentinelLite AI v0.8.0-alpha`.
+- The Ubuntu/Debian-style fixture scan produced 3 authentication events and 3 alerts.
+- Notification export produced 3 included alerts and 0 omitted alerts.
+- Notification JSON schema and privacy compatibility validation passed. The exported JSON did not contain `labadmin`, `demo-user`, `192.0.2.10`, `192.0.2.11`, `/usr/bin/id`, `Failed SSH login attempt`, or `Successful SSH login`.
+- The source alert report retained exactly the five established top-level fields: `report_id`, `report_type`, `generated_at`, `alert_count`, and `alerts`. No top-level `explanations` field was added.
+- Report review accepted the original generated alert report after notification export.
+- The Ubuntu worktree was clean after validation.
 - Publication as a GitHub release or pre-release is not claimed.
 
 ## Safety Scope
