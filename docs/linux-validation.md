@@ -4,7 +4,56 @@ SentinelLite AI, including baseline-backed file integrity monitoring, was valida
 
 ## v0.9 Installation Validation Status
 
-Final v0.9 Ubuntu ARM64 validation is pending. The release validation will check editable installation, the `sentinellite` console command, `python -m sentinellite`, side-effect-free version output, and wheel metadata, entry-point, license, and packaged default-config resources. No final v0.9 Linux result or production-readiness claim is made here yet.
+Final v0.9 Ubuntu ARM64 validation passed. This validation covered installed-package behavior, both supported entry styles, fixture-based scan and review behavior, notification compatibility, and wheel contents without scanning a real host authentication log.
+
+### v0.9 Ubuntu ARM64 Environment
+
+| Field | Observed Value |
+|---|---|
+| Operating system | Linux |
+| Architecture | `aarch64` |
+| Python version | `3.14.4` |
+| Ruff version | `0.16.3` |
+| Pytest version | `9.1.1` |
+| Ruff result | Passed |
+| Pytest result | 588 passed |
+| Working tree after validation | Clean |
+
+### v0.9 Installation and Entry-Point Results
+
+- Editable installation: passed
+- `python -m pip check`: passed
+- `sentinellite --version`: passed and displayed `SentinelLite AI v0.9.0-alpha`
+- `python -m sentinellite --version`: passed and displayed `SentinelLite AI v0.9.0-alpha`
+- Bare `sentinellite` status from `/tmp`: passed
+- Bare `python -m sentinellite` status from `/tmp`: passed
+
+### v0.9 Authentication Fixture and Report Results
+
+`auth-sources list` completed successfully. It inventoried `/var/log/auth.log` as available and `/var/log/secure` as missing. This was inventory only: the command did not read either log, and the available `/var/log/auth.log` was not passed to `scan-auth`.
+
+Scan validation used the bundled `examples/auth_logs/sample_ubuntu_auth.log` fixture. It produced 3 authentication events and 3 alerts. `reports list` and `reports show` both accepted the generated alert report.
+
+The generated alert report retained exactly these five top-level fields:
+
+- `report_id`
+- `report_type`
+- `generated_at`
+- `alert_count`
+- `alerts`
+
+No top-level `explanations` field was added. Exporting the report produced a separate notification summary with 3 included alerts and 0 omitted alerts. Notification privacy compatibility passed, and the notification artifact retained its independent schema rather than becoming a SentinelLite alert report.
+
+### v0.9 Wheel Results
+
+The wheel build and metadata/resource validation passed. The wheel contained:
+
+- the MIT License
+- `sentinellite/config/default.yaml`
+- `sentinellite-ai` package metadata
+- the `sentinellite` console entry point
+
+This validation supports local package and installation readiness only. `v0.9.0-alpha` remains in development and is not a production EDR release. It does not provide real AI or LLM execution, external notification delivery, daemon or background monitoring, or automatic remediation.
 
 ## v0.8 Notification Export Validation Status
 

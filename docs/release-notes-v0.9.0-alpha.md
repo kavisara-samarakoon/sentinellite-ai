@@ -28,12 +28,43 @@ This milestone focuses on package, installation, and CLI usability readiness for
 
 ## Validation
 
-- The current macOS development validation passed with 588 tests before the M5 documentation milestone.
-- Final macOS release validation is pending.
-- Final Ubuntu ARM64 release validation is pending.
-- GitHub pull-request CI for the completed v0.9 milestone is pending.
+### GitHub PR Validation
 
-These statements do not claim a published release or final platform validation. The validation contract includes editable installation, dependency checking, Ruff, Pytest, both CLI entry styles, wheel construction, and wheel metadata, license, entry-point, and packaged-resource checks.
+PR #8 passed the `CI/Packaging, Ruff, and Pytest` workflow for both `push` and `pull_request`. The workflow validated editable installation, `pip check`, console and module entry points, Ruff, Pytest, a fixture scan, alert-report and notification compatibility, wheel metadata and packaged resources, and an isolated wheel smoke test.
+
+### macOS Development Validation
+
+Final macOS development validation passed with Python 3.14.6:
+
+- Editable installation and `pip check`: passed
+- `sentinellite --version` and `python -m sentinellite --version`: passed
+- Wheel build and wheel license/resource smoke: passed
+- Ruff: passed
+- Pytest: 588 passed
+- `git diff --check`: passed
+- Generated `dist/`, `build/`, and egg-info artifacts: removed after validation
+
+### Ubuntu ARM64 Validation
+
+Final Ubuntu ARM64 validation passed on Linux `aarch64` with Python 3.14.4, Ruff 0.16.3, and Pytest 9.1.1:
+
+- Editable installation and `pip check`: passed
+- Console and module version commands: passed
+- Bare console and module status from `/tmp`: passed
+- Ruff: passed
+- Pytest: 588 passed
+- `auth-sources list`: passed; `/var/log/auth.log` was inventoried as available and `/var/log/secure` as missing
+- Bundled Ubuntu authentication fixture scan: 3 authentication events and 3 alerts
+- `reports list` and `reports show`: passed
+- Notification export: 3 included alerts and 0 omitted alerts
+- Notification privacy and separate-schema compatibility: passed
+- Existing five-field alert-report schema and report-review compatibility: passed
+- Wheel build, metadata, resource, MIT License, and console entry-point validation: passed
+- Final worktree: clean
+
+The available `/var/log/auth.log` was inventoried only; it was not read or scanned. Scan behavior was validated with `examples/auth_logs/sample_ubuntu_auth.log`. The original generated alert report retained exactly `report_id`, `report_type`, `generated_at`, `alert_count`, and `alerts` at the top level, with no top-level `explanations` field. The notification summary retained its independent schema.
+
+These results validate the in-development milestone; they do not claim a published GitHub release or production readiness. Detailed Ubuntu results are recorded in the [Linux ARM64 validation notes](linux-validation.md).
 
 ## Installation and Entry-Point Behavior
 

@@ -68,7 +68,7 @@ Current milestone status:
 - Installed `sentinellite` command and side-effect-free `--version` option implemented
 - Editable-install and wheel metadata, resource, and entry-point validation implemented
 - MIT License added
-- 588 automated tests passing before the v0.9 documentation milestone
+- 588 automated tests passed during final v0.9 validation
 
 Baseline-backed file integrity monitoring is implemented and has been validated on Ubuntu ARM64. See the [Linux ARM64 validation notes](docs/linux-validation.md).
 
@@ -209,7 +209,7 @@ Current development setup:
 - Pytest testing
 - Ruff linting
 
-On macOS, SentinelLite AI runs in development mode. Full monitoring features will be tested inside Linux environments such as ARM64 Linux VMs.
+On macOS, SentinelLite AI runs in development mode. Final v0.9 installation and fixture-based validation also passed in an Ubuntu ARM64 VM; Linux remains the target monitoring environment.
 
 ## Installation
 
@@ -658,7 +658,7 @@ This is local export only. SentinelLite AI implements no external delivery, netw
 
 ## Testing
 
-The test suite passed 588 tests before the v0.9 documentation milestone. Coverage includes packaging, installed entry points, configuration, collectors, authentication source discovery, Linux text fixtures, baseline models and persistence, normalization, detection, scoring, reporting, deterministic explanations, report review, notification export, privacy regression, pipelines, and CLI behavior.
+The final v0.9 validation passed 588 tests on both macOS development and Ubuntu ARM64 environments. Coverage includes packaging, installed entry points, configuration, collectors, authentication source discovery, Linux text fixtures, baseline models and persistence, normalization, detection, scoring, reporting, deterministic explanations, report review, notification export, privacy regression, pipelines, and CLI behavior.
 
 Run all tests:
 
