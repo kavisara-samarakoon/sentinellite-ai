@@ -30,7 +30,7 @@ class ConfigError(Exception):
 
 
 def default_config() -> SentinelLiteConfig:
-    """Return the built-in configuration matching v0.4 runtime defaults."""
+    """Return the built-in defaults for explicit TOML-configurable behavior."""
     return SentinelLiteConfig()
 
 

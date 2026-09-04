@@ -5,19 +5,19 @@ app:
 monitoring:
   authentication:
     enabled: true
-    description: "Monitor Linux authentication logs and SSH login activity"
+    description: "Scan an explicitly selected authentication log on demand"
 
   process:
     enabled: true
-    description: "Monitor running processes and suspicious process activity"
+    description: "Observe the current process list on demand"
 
   network:
     enabled: true
-    description: "Monitor network connections and open ports"
+    description: "Read-only observation of active network connection metadata"
 
   file_integrity:
     enabled: true
-    description: "Monitor selected critical files for changes"
+    description: "Observe explicitly selected file paths on demand"
 
 reporting:
   json_reports:
@@ -27,7 +27,7 @@ reporting:
 ai_analysis:
   enabled: false
   provider: "none"
-  note: "AI analysis will be added after the detection and reporting pipeline is stable"
+  note: "Real AI or LLM execution is not implemented"
 
 risk:
   low: 25

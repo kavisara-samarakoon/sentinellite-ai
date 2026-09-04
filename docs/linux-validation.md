@@ -2,6 +2,22 @@
 
 SentinelLite AI, including baseline-backed file integrity monitoring, was validated successfully in an Ubuntu ARM64 virtual machine. This document records the observed environment, quality checks, CLI status, and scan summaries from that validation run.
 
+## v1.0.0-beta Validation Status
+
+Final v1 beta Ubuntu ARM64 validation is pending. No v1 beta platform result is claimed by
+this section yet. The final run must use the exact release-candidate source state and follow
+the [release checklist](release-checklist.md).
+
+Authentication scan validation will use the bundled non-sensitive fixtures only.
+`auth-sources list` may inventory the candidate paths, but a real `/var/log/auth.log` or
+`/var/log/secure` must not be passed to `scan-auth` as part of release validation. The final
+record should include the commit SHA, environment and tool versions, test count, installed
+entry-point results, fixture results, schema and privacy checks, artifact validation, and
+final worktree state.
+
+The sections below are preserved historical validation records. Their version-specific
+commands and results are not current v1 beta claims.
+
 ## v0.9 Installation Validation Status
 
 Final v0.9 Ubuntu ARM64 validation passed. This validation covered installed-package behavior, both supported entry styles, fixture-based scan and review behavior, notification compatibility, and wheel contents without scanning a real host authentication log.
@@ -170,7 +186,8 @@ In the earlier recorded validation, the application started in its intended Linu
 | Python version | `3.14.4` |
 | Runtime mode | Linux target environment |
 
-`PYTHONPATH=src` was exported during local VM validation.
+`PYTHONPATH=src` was exported during this historical pre-packaging validation. Current
+installed development and release flows do not require or recommend `PYTHONPATH`.
 
 ## Validated Source State
 

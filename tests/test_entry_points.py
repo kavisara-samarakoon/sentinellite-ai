@@ -89,8 +89,46 @@ def test_bare_entry_point_status_works_outside_checkout(
 
     assert result.returncode == 0
     assert "SentinelLite AI v0.9.0-alpha" in result.stdout
-    assert "Status: READY" in result.stdout
+    assert "Local Defensive Observation CLI" in result.stdout
+    assert "Status: AVAILABLE" in result.stdout
     assert "Configuration error" not in result.stdout
+    assert result.stderr == ""
+
+
+@pytest.mark.parametrize("command", [CONSOLE_COMMAND, MODULE_COMMAND])
+def test_entry_point_status_reflects_explicit_toml_config(
+    command: tuple[str, ...],
+    tmp_path: Path,
+) -> None:
+    config_path = tmp_path / "sentinellite.toml"
+    config_path.write_text(
+        """[modules]
+authentication = false
+process = false
+network = false
+file_integrity = false
+""",
+        encoding="utf-8",
+    )
+
+    result = run_entry_point(
+        command,
+        "--config",
+        str(config_path),
+        cwd=tmp_path,
+    )
+
+    normalized_output = " ".join(result.stdout.split())
+    assert result.returncode == 0
+    for capability_name in (
+        "Authentication Scan",
+        "Process Scan",
+        "Network Observation",
+        "File Integrity Check",
+    ):
+        assert capability_name in normalized_output
+    assert normalized_output.count("Disabled") == 4
+    assert "Status: AVAILABLE" in result.stdout
     assert result.stderr == ""
 
 
