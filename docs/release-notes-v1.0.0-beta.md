@@ -54,15 +54,24 @@ boundaries, and repeatable release validation. It is not a major feature milesto
 ## Validation Status
 
 - Local M3 development tests and package checks: passed on Python 3.14 (597 tests)
-- GitHub pull-request CI: pending
-- Final macOS validation: pending M4
-- Final Ubuntu ARM64 validation: pending M5
-- GitHub tag and pre-release: not created
+- Final macOS candidate validation: completed at `c873330` on Apple Silicon `arm64` with
+  Python `3.14.6` and 597 passing tests
+- Final Ubuntu ARM64 candidate validation: completed at `c873330` on `aarch64` with Python
+  `3.14.4` and 597 passing tests
+- GitHub pull-request review: pending
+- GitHub CI on the final branch and pull-request state: pending, including the Python 3.11
+  matrix job
+- Merge to `main`: pending
+- Final tag: pending
+- Final release artifact rebuild from the exact merged and tagged commit: pending
+- Final SHA-256 checksums for rebuilt release artifacts: pending
+- GitHub pre-release publication: pending
 
-Validation results must not be recorded as final until they have run against the exact
-candidate source state. The [release checklist](release-checklist.md) defines the required
-gates, and platform evidence belongs in the [Linux validation notes](linux-validation.md)
-after it is observed.
+The completed candidate runs include entry-point, fixture, report, notification, schema,
+privacy, package, and isolated-install validation. Their candidate artifact hashes are
+recorded in the [platform validation notes](linux-validation.md), but they are not final
+release artifact hashes. The [release checklist](release-checklist.md) defines the remaining
+PR, CI, merge, tag, rebuild, checksum, and publication gates.
 
 ## Safety Scope
 
