@@ -2,6 +2,133 @@
 
 SentinelLite AI, including baseline-backed file integrity monitoring, was validated successfully in an Ubuntu ARM64 virtual machine. This document records the observed environment, quality checks, CLI status, and scan summaries from that validation run.
 
+## v1.0.0-beta Final Candidate Validation
+
+Final candidate validation passed on macOS Apple Silicon and Ubuntu ARM64 at release-candidate
+commit `c873330`. These results validate that candidate source state only. Pull-request review,
+GitHub CI, merge, tagging, final artifact rebuild, final checksums, and GitHub pre-release
+publication remain separate release gates in the [release checklist](release-checklist.md).
+
+### macOS Final Candidate Validation
+
+| Field | Observed Value |
+|---|---|
+| Operating system | macOS / Darwin |
+| Architecture | Apple Silicon `arm64` |
+| Python version | `3.14.6` |
+| Release-candidate commit | `c873330` |
+
+The validation used a clean temporary clone. Editable installation and `python -m pip check`
+passed. The console and module entry points both passed and reported exactly
+`SentinelLite AI v1.0.0-beta`. Ruff passed, all 597 tests passed, and `git diff --check`
+passed.
+
+The authentication workflow used only the deterministic bundled Ubuntu fixture,
+`examples/auth_logs/sample_ubuntu_auth.log`. It produced:
+
+- 3 authentication events
+- 3 security events
+- 3 detection matches
+- 3 scored alerts
+
+`reports list`, `reports show`, and local notification-summary export passed. The alert report
+retained exactly these five top-level fields:
+
+- `report_id`
+- `report_type`
+- `generated_at`
+- `alert_count`
+- `alerts`
+
+There was no top-level `explanations` field. The separate notification summary retained
+`schema_version = 1`, `alert_count = 3`, `included_alert_count = 3`, and
+`omitted_alert_count = 0`. Privacy assertions passed for fixture usernames, addresses,
+command text, and alert-message text.
+
+The wheel and source distribution built successfully. Wheel package metadata reported
+`1.0.0b0`; MIT metadata and the license file, the `sentinellite` console entry point, and
+`sentinellite/config/default.yaml` were present. Isolated wheel installation passed outside
+the repository checkout. The final disposable clone was cleaned successfully.
+
+Candidate-validation artifact hashes from this macOS run were:
+
+- Wheel SHA-256: `23905088687520ca316d6a2fb690f6494c1e7cfea7b0106d191f629f660f57c7`
+- Source distribution SHA-256: `129d54db9a8c7190e7cdd0b1595425d58d6d5f0defaa0c4d5342bb8e9f765cec`
+
+These are validation-run candidate hashes only. They are not final GitHub release artifact
+hashes. Final release artifacts must be rebuilt from the exact merged and tagged commit.
+
+### Ubuntu ARM64 Final Candidate Validation
+
+| Field | Observed Value |
+|---|---|
+| Operating system | Ubuntu Linux |
+| Kernel | `7.0.0-30-generic` |
+| Architecture | `aarch64` |
+| Python version | `3.14.4` |
+| Ruff version | `0.16.6` |
+| Pytest version | `9.1.1` |
+| Release-candidate commit | `c873330` |
+| Final worktree | Clean at `c873330` |
+
+The validation used a clean temporary clone. Editable installation and `python -m pip check`
+passed. Both entry points reported exactly `SentinelLite AI v1.0.0-beta` and exposed the
+expected command tree. Ruff passed, all 597 tests passed, and `git diff --check` passed.
+
+The explicit TOML status regression passed consistently through the console and module entry
+points:
+
+| Explicit module setting | Displayed status |
+|---|---|
+| `authentication = false` | Disabled |
+| `process = false` | Disabled |
+| `network = false` | Disabled |
+| `file_integrity = false` | Disabled |
+
+The CLI displayed `Local Defensive Observation CLI`, `Status: AVAILABLE`, and
+`Real AI / LLM Execution: Not implemented`.
+
+Authentication source inventory reported `/var/log/auth.log` as available and
+`/var/log/secure` as missing. This was inventory only. Neither path was read or passed to
+`scan-auth`, and this validation does not claim that a real host authentication log was
+scanned.
+
+Fixture validation used only the bundled
+`examples/auth_logs/sample_ubuntu_auth.log`. It produced:
+
+- 3 authentication events
+- 3 security events
+- 3 detection matches
+- 3 scored alerts
+
+`reports list`, `reports show`, and local notification-summary export passed. The notification
+recorded 3 total alerts, 3 included alerts, and 0 omitted alerts.
+
+The alert report retained exactly the five established top-level fields—`report_id`,
+`report_type`, `generated_at`, `alert_count`, and `alerts`—with no top-level `explanations`
+field. The separate notification summary retained `schema_version = 1`, and privacy
+assertions passed.
+
+Wheel metadata reported `1.0.0b0`. The wheel included MIT metadata and the license file, the
+`sentinellite` console entry point, and `sentinellite/config/default.yaml`. The source
+distribution included `LICENSE`, `pyproject.toml`, and the packaged default YAML. Isolated
+wheel installation and `pip check` passed outside the checkout.
+
+`pip-audit` reported `No known vulnerabilities found`. It skipped `sentinellite-ai` itself
+because this local beta package is not published on PyPI. That expected skip is not a
+vulnerability finding.
+
+Candidate-validation artifact hashes from this Ubuntu ARM64 run were:
+
+- Wheel SHA-256: `57d5240d12c094883c983b013a9815d5ce8ed9e4232085e5bec07ea9106d12ab`
+- Source distribution SHA-256: `e9e7ddb456b3ba1549d7d1ba2cc0f87c11f2260c5554d3a52a8fb5291931e432`
+
+These are validation-run candidate hashes only. They are not final GitHub release artifact
+hashes. Final release artifacts must be rebuilt from the exact merged and tagged commit.
+
+The sections below are preserved historical validation records. Their version-specific
+commands and results are not current v1 beta claims.
+
 ## v0.9 Installation Validation Status
 
 Final v0.9 Ubuntu ARM64 validation passed. This validation covered installed-package behavior, both supported entry styles, fixture-based scan and review behavior, notification compatibility, and wheel contents without scanning a real host authentication log.
@@ -170,7 +297,8 @@ In the earlier recorded validation, the application started in its intended Linu
 | Python version | `3.14.4` |
 | Runtime mode | Linux target environment |
 
-`PYTHONPATH=src` was exported during local VM validation.
+`PYTHONPATH=src` was exported during this historical pre-packaging validation. Current
+installed development and release flows do not require or recommend `PYTHONPATH`.
 
 ## Validated Source State
 

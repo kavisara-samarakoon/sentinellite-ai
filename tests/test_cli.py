@@ -1087,20 +1087,58 @@ def test_scan_auth_command_with_flag_writes_json_explanations(tmp_path: Path) ->
     assert "is compromised" not in explanation_text
 
 
-def test_default_status_describes_implemented_and_planned_modules() -> None:
+def test_default_status_describes_on_demand_capabilities() -> None:
     result = runner.invoke(app)
 
     assert result.exit_code == 0
-    assert "SentinelLite AI v0.9.0-alpha" in result.stdout
-    assert "│ Authentication Monitor  │ Enabled │" in result.stdout
-    assert "│ Process Monitor         │ Enabled │" in result.stdout
-    assert "│ Network Monitor         │ Enabled │" in result.stdout
-    assert "│ File Integrity Monitor  │ Enabled │" in result.stdout
-    assert "│ JSON Reporting          │ Enabled │" in result.stdout
-    assert "│ AI-Assisted Explanation │ Planned │" in result.stdout
-    assert "Monitor active network connections and" in result.stdout
-    assert "Observe selected file paths for" in result.stdout
-    assert "Not implemented; planned for a future" not in result.stdout
+    assert "SentinelLite AI v1.0.0-beta" in result.stdout
+    assert "Local Defensive Observation CLI" in result.stdout
+    assert "SentinelLite AI status" in result.stdout
+    assert "Status: AVAILABLE" in result.stdout
+    assert "Authentication Scan" in result.stdout
+    assert "Process Scan" in result.stdout
+    assert "Network Observation" in result.stdout
+    assert "File Integrity Check" in result.stdout
+    assert "JSON Reporting" in result.stdout
+    assert "Real AI / LLM Execution" in result.stdout
+    assert "Not implemented" in result.stdout
+    assert "Deterministic local" in result.stdout
+    assert "templates only" in result.stdout
+    assert "Starting SentinelLite AI" not in result.stdout
+    assert "monitoring agent" not in result.stdout.lower()
+
+
+def test_bare_status_reflects_explicit_toml_module_and_reporting_settings(
+    tmp_path: Path,
+) -> None:
+    config_path = tmp_path / "sentinellite.toml"
+    config_path.write_text(
+        """[reporting]
+output_dir = "/tmp/sentinellite-status-reports"
+
+[modules]
+authentication = false
+process = false
+network = false
+file_integrity = false
+""",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["--config", str(config_path)])
+
+    assert result.exit_code == 0
+    normalized_output = " ".join(result.stdout.split())
+    for capability_name in (
+        "Authentication Scan",
+        "Process Scan",
+        "Network Observation",
+        "File Integrity Check",
+    ):
+        assert capability_name in normalized_output
+    assert normalized_output.count("Disabled") == 4
+    assert "/tmp/sentinellite-status-reports" in result.stdout
+    assert "Status: AVAILABLE" in result.stdout
 
 
 def test_version_option_exits_before_config_or_system_collection(
@@ -1116,7 +1154,7 @@ def test_version_option_exits_before_config_or_system_collection(
     result = runner.invoke(app, ["--version"])
 
     assert result.exit_code == 0
-    assert result.stdout == "SentinelLite AI v0.9.0-alpha\n"
+    assert result.stdout == "SentinelLite AI v1.0.0-beta\n"
     assert result.stderr == ""
 
 

@@ -11,8 +11,13 @@ on:
 
 jobs:
   test:
-    name: Packaging, Ruff, and Pytest
+    name: Python ${{ matrix.python-version }} / Packaging, Ruff, and Pytest
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.14"]
 
     env:
       PYTHONDONTWRITEBYTECODE: "1"
@@ -24,7 +29,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
 
       - name: Upgrade pip
         run: python -m pip install --upgrade pip
@@ -74,10 +79,15 @@ jobs:
               metadata = wheel_file.read(metadata_names[0]).decode("utf-8")
               entry_points = wheel_file.read(entry_point_names[0]).decode("utf-8")
               assert "Name: sentinellite-ai" in metadata
-              assert "Version: 0.9.0a0" in metadata
+              assert "Version: 1.0.0b0" in metadata
+              assert "License-Expression: MIT" in metadata
               assert "sentinellite = sentinellite.main:cli" in entry_points
+              assert any(
+                  name.endswith(".dist-info/licenses/LICENSE")
+                  for name in names
+              )
 
-          print("WHEEL_METADATA_SMOKE: PASSED")
+          print("V1_BETA_WHEEL_METADATA_SMOKE: PASSED")
           PY
 
       - name: Validate wheel in an isolated environment
@@ -90,20 +100,20 @@ jobs:
           print(wheels[0].resolve())
           PY
           )"
-          wheel_environment=/tmp/sentinellite-v09-wheel-environment
+          wheel_environment=/tmp/sentinellite-v1-beta-wheel-environment
           rm -rf "$wheel_environment"
           python -m venv "$wheel_environment"
           "$wheel_environment/bin/python" -m pip install "$wheel_path"
 
           cd /tmp
-          "$wheel_environment/bin/sentinellite" --version
-          "$wheel_environment/bin/python" -m sentinellite --version
+          test "$("$wheel_environment/bin/sentinellite" --version)" = "SentinelLite AI v1.0.0-beta"
+          test "$("$wheel_environment/bin/python" -m sentinellite --version)" = "SentinelLite AI v1.0.0-beta"
           "$wheel_environment/bin/sentinellite"
 
       - name: Validate installed entry points
         run: |
-          sentinellite --version
-          python -m sentinellite --version
+          test "$(sentinellite --version)" = "SentinelLite AI v1.0.0-beta"
+          test "$(python -m sentinellite --version)" = "SentinelLite AI v1.0.0-beta"
 
           cd /tmp
           sentinellite
@@ -117,15 +127,15 @@ jobs:
 
       - name: Run authentication scan smoke test
         run: |
-          console_report_dir=/tmp/sentinellite-v09-console-auth
+          console_report_dir=/tmp/sentinellite-console-auth
           rm -rf "$console_report_dir"
           sentinellite scan-auth examples/auth_logs/sample_auth.log --output-dir "$console_report_dir" | tee /tmp/sentinellite-auth-smoke.txt
           grep -Fq "Deterministic Alert Explanations" /tmp/sentinellite-auth-smoke.txt
 
       - name: Validate Linux authentication log fixture compatibility
         run: |
-          ubuntu_report_dir=/tmp/sentinellite-v07-ubuntu-auth
-          rhel_report_dir=/tmp/sentinellite-v07-rhel-secure
+          ubuntu_report_dir=/tmp/sentinellite-ubuntu-auth-fixture
+          rhel_report_dir=/tmp/sentinellite-rhel-auth-fixture
           rm -rf "$ubuntu_report_dir" "$rhel_report_dir"
 
           python -m sentinellite auth-sources list
@@ -166,12 +176,12 @@ jobs:
           )"
           python -m sentinellite reports show "$ubuntu_report_path"
 
-      - name: Validate v0.8 local notification summary export
+      - name: Validate local notification summary export
         run: |
-          report_dir=/tmp/sentinellite-v08-report
-          notification_dir=/tmp/sentinellite-v08-notifications
+          report_dir=/tmp/sentinellite-notification-source-report
+          notification_dir=/tmp/sentinellite-notification-output
           notification_path="$notification_dir/alert-summary.json"
-          source_snapshot=/tmp/sentinellite-v08-source-before.bin
+          source_snapshot=/tmp/sentinellite-notification-source-before.bin
           rm -rf "$report_dir" "$notification_dir"
           mkdir -p "$notification_dir"
 
@@ -256,7 +266,7 @@ jobs:
 
       - name: Validate local report review commands
         run: |
-          report_dir=/tmp/sentinellite-v06-reports
+          report_dir=/tmp/sentinellite-report-review
           invalid_report="$report_dir/invalid.json"
           rm -rf "$report_dir"
 
@@ -272,8 +282,8 @@ jobs:
           print(reports[0])
           PY
           )"
-          python -m sentinellite reports show "$report_path" | tee /tmp/sentinellite-v06-show.txt
-          grep -Fq "SentinelLite Alert Report Summary" /tmp/sentinellite-v06-show.txt
+          python -m sentinellite reports show "$report_path" | tee /tmp/sentinellite-report-show.txt
+          grep -Fq "SentinelLite Alert Report Summary" /tmp/sentinellite-report-show.txt
 
           python - "$invalid_report" <<'PY'
           import sys
@@ -283,20 +293,20 @@ jobs:
           PY
 
           set +e
-          python -m sentinellite reports list --report-dir "$report_dir" > /tmp/sentinellite-v06-mixed-list.txt 2>&1
+          python -m sentinellite reports list --report-dir "$report_dir" > /tmp/sentinellite-mixed-list.txt 2>&1
           mixed_list_status=$?
-          python -m sentinellite reports show "$invalid_report" > /tmp/sentinellite-v06-invalid-show.txt 2>&1
+          python -m sentinellite reports show "$invalid_report" > /tmp/sentinellite-invalid-show.txt 2>&1
           invalid_show_status=$?
           set -e
 
-          cat /tmp/sentinellite-v06-mixed-list.txt
-          cat /tmp/sentinellite-v06-invalid-show.txt
+          cat /tmp/sentinellite-mixed-list.txt
+          cat /tmp/sentinellite-invalid-show.txt
           test "$mixed_list_status" -ne 0
           test "$invalid_show_status" -ne 0
-          grep -Fq "Malformed JSON" /tmp/sentinellite-v06-mixed-list.txt
-          grep -Fq "Malformed JSON" /tmp/sentinellite-v06-invalid-show.txt
-          ! grep -Fq "Traceback" /tmp/sentinellite-v06-mixed-list.txt
-          ! grep -Fq "Traceback" /tmp/sentinellite-v06-invalid-show.txt
+          grep -Fq "Malformed JSON" /tmp/sentinellite-mixed-list.txt
+          grep -Fq "Malformed JSON" /tmp/sentinellite-invalid-show.txt
+          ! grep -Fq "Traceback" /tmp/sentinellite-mixed-list.txt
+          ! grep -Fq "Traceback" /tmp/sentinellite-invalid-show.txt
 
       - name: Run authentication JSON explanation smoke test
         run: |

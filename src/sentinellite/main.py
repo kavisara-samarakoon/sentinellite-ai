@@ -47,7 +47,7 @@ console = Console()
 CURRENT_VERSION = __version__
 
 app = typer.Typer(
-    help="SentinelLite AI - Lightweight Linux endpoint detection and monitoring agent.",
+    help="SentinelLite AI - Local defensive observation and report-review CLI.",
     invoke_without_command=True,
 )
 reports_app = typer.Typer(
@@ -165,7 +165,7 @@ def show_banner(config: dict[str, Any]) -> None:
 
     banner = f"""
 {app_name} v{CURRENT_VERSION}
-Linux Endpoint Security Monitoring Agent
+Local Defensive Observation CLI
 """
     console.print(Panel.fit(banner, title=app_name, border_style="cyan"))
 
@@ -192,49 +192,50 @@ def format_status(enabled: bool) -> str:
     return "[red]Disabled[/red]"
 
 
-def format_planned_status() -> str:
-    return "[yellow]Planned[/yellow]"
+def format_not_implemented_status() -> str:
+    return "[yellow]Not implemented[/yellow]"
 
 
-def show_modules(config: dict[str, Any]) -> None:
-    monitoring = config["monitoring"]
-    reporting = config["reporting"]
-    ai_analysis = config.get("ai_analysis", {})
+def show_modules(
+    display_config: dict[str, Any],
+    selected_config: SentinelLiteConfig,
+) -> None:
+    monitoring = display_config["monitoring"]
 
-    table = Table(title="Monitoring Modules")
+    table = Table(title="Available Local Capabilities")
     table.add_column("Module", style="bold")
     table.add_column("Status")
     table.add_column("Description")
 
     table.add_row(
-        "Authentication Monitor",
-        format_status(monitoring["authentication"]["enabled"]),
+        "Authentication Scan",
+        format_status(selected_config.modules.authentication),
         monitoring["authentication"].get("description", ""),
     )
     table.add_row(
-        "Process Monitor",
-        format_status(monitoring["process"]["enabled"]),
+        "Process Scan",
+        format_status(selected_config.modules.process),
         monitoring["process"].get("description", ""),
     )
     table.add_row(
-        "Network Monitor",
-        format_status(monitoring["network"]["enabled"]),
-        "Monitor active network connections and investigation-focused network activity",
+        "Network Observation",
+        format_status(selected_config.modules.network),
+        "Read-only observation of active network connection metadata",
     )
     table.add_row(
-        "File Integrity Monitor",
-        format_status(monitoring["file_integrity"]["enabled"]),
-        "Observe selected file paths for integrity-related investigation signals",
+        "File Integrity Check",
+        format_status(selected_config.modules.file_integrity),
+        "On-demand observation of explicitly selected file paths",
     )
     table.add_row(
         "JSON Reporting",
-        format_status(reporting["json_reports"]["enabled"]),
-        f"Output directory: {reporting['json_reports'].get('output_dir', 'reports')}",
+        format_status(True),
+        f"Output directory: {selected_config.reporting.output_dir}",
     )
     table.add_row(
-        "AI-Assisted Explanation",
-        format_planned_status(),
-        ai_analysis.get("note", "Optional explanation layer"),
+        "Real AI / LLM Execution",
+        format_not_implemented_status(),
+        "Deterministic local explanation templates only",
     )
 
     console.print(table)
@@ -255,29 +256,29 @@ def show_risk_thresholds(config: dict[str, Any]) -> None:
     console.print(table)
 
 
-def show_status() -> None:
+def show_status(selected_config: SentinelLiteConfig) -> None:
     try:
-        config = load_config()
+        display_config = load_config()
     except ConfigError as error:
         console.print(f"[red][!] Configuration error: {error}[/red]")
         raise typer.Exit(code=1) from error
 
     system_info = collect_system_info()
 
-    show_banner(config)
-    console.print("[green][+] Starting SentinelLite AI...[/green]\n")
+    show_banner(display_config)
+    console.print("[cyan]SentinelLite AI status[/cyan]\n")
 
     show_system_info(system_info)
     console.print()
-    show_modules(config)
+    show_modules(display_config, selected_config)
     console.print()
-    show_risk_thresholds(config)
+    show_risk_thresholds(display_config)
 
-    console.print("\n[green][+] Status: READY[/green]")
+    console.print("\n[green][+] Status: AVAILABLE[/green]")
 
     if system_info.operating_system != "Linux":
         console.print(
-            "[yellow][!] Note: SentinelLite AI is designed for Linux monitoring. "
+            "[yellow][!] Note: SentinelLite AI is designed for Linux endpoint observation. "
             "You are currently running it in development mode.[/yellow]"
         )
 
@@ -312,7 +313,7 @@ def main(
         raise typer.Exit(code=1) from error
 
     if ctx.invoked_subcommand is None:
-        show_status()
+        show_status(_selected_config(ctx))
 
 
 @app.command("config-init")
@@ -334,7 +335,7 @@ def config_init_command(
 
     console.print(f"[green][+] Created default config:[/green] {created_path}")
     console.print(
-        "Example: python -m sentinellite "
+        "Example: sentinellite "
         f"--config {created_path} scan-auth examples/auth_logs/sample_auth.log"
     )
 
