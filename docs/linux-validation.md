@@ -5,9 +5,9 @@ SentinelLite AI, including baseline-backed file integrity monitoring, was valida
 ## v1.0.0-beta Final Candidate Validation
 
 Final candidate validation passed on macOS Apple Silicon and Ubuntu ARM64 at release-candidate
-commit `c873330`. These results validate that candidate source state only. Pull-request review,
-GitHub CI, merge, tagging, final artifact rebuild, final checksums, and GitHub pre-release
-publication remain separate release gates in the [release checklist](release-checklist.md).
+commit `c873330`. These results validate that candidate source state only. The later final
+tagged-release artifact rebuild, checksums, and publication are recorded separately in the
+[v1.0.0-beta release notes](release-notes-v1.0.0-beta.md).
 
 ### macOS Final Candidate Validation
 
@@ -56,7 +56,8 @@ Candidate-validation artifact hashes from this macOS run were:
 - Source distribution SHA-256: `129d54db9a8c7190e7cdd0b1595425d58d6d5f0defaa0c4d5342bb8e9f765cec`
 
 These are validation-run candidate hashes only. They are not final GitHub release artifact
-hashes. Final release artifacts must be rebuilt from the exact merged and tagged commit.
+hashes. Final release artifacts were later rebuilt from the exact merged and tagged commit;
+their official hashes are recorded in the v1.0.0-beta release notes.
 
 ### Ubuntu ARM64 Final Candidate Validation
 
@@ -124,7 +125,8 @@ Candidate-validation artifact hashes from this Ubuntu ARM64 run were:
 - Source distribution SHA-256: `e9e7ddb456b3ba1549d7d1ba2cc0f87c11f2260c5554d3a52a8fb5291931e432`
 
 These are validation-run candidate hashes only. They are not final GitHub release artifact
-hashes. Final release artifacts must be rebuilt from the exact merged and tagged commit.
+hashes. Final release artifacts were later rebuilt from the exact merged and tagged commit;
+their official hashes are recorded in the v1.0.0-beta release notes.
 
 The sections below are preserved historical validation records. Their version-specific
 commands and results are not current v1 beta claims.
