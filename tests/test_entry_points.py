@@ -71,7 +71,7 @@ def test_entry_point_versions_agree_outside_checkout(tmp_path: Path) -> None:
         cwd=tmp_path,
     )
 
-    expected_output = "SentinelLite AI v0.9.0-alpha\n"
+    expected_output = "SentinelLite AI v1.0.0-beta\n"
     assert console_result.returncode == 0
     assert module_result.returncode == 0
     assert console_result.stdout == expected_output
@@ -88,7 +88,7 @@ def test_bare_entry_point_status_works_outside_checkout(
     result = run_entry_point(command, cwd=tmp_path)
 
     assert result.returncode == 0
-    assert "SentinelLite AI v0.9.0-alpha" in result.stdout
+    assert "SentinelLite AI v1.0.0-beta" in result.stdout
     assert "Local Defensive Observation CLI" in result.stdout
     assert "Status: AVAILABLE" in result.stdout
     assert "Configuration error" not in result.stdout

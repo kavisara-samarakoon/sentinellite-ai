@@ -10,6 +10,7 @@ CURRENT_DOCUMENTS = (
     PROJECT_ROOT / "docs/linux-validation.md",
     PROJECT_ROOT / "docs/data-contracts.md",
     PROJECT_ROOT / "docs/release-checklist.md",
+    PROJECT_ROOT / "docs/release-notes-v1.0.0-beta.md",
 )
 MARKDOWN_LINK_PATTERN = re.compile(r"\[[^]]+\]\(([^)]+)\)")
 
@@ -34,6 +35,47 @@ def test_readme_exposes_current_install_and_release_documents() -> None:
     assert "docs/data-contracts.md" in readme
     assert "docs/release-checklist.md" in readme
     assert "production EDR" in readme
+    assert "The current version is `v1.0.0-beta`" in readme
+    assert "not yet published as a\nGitHub release" in readme
+    assert "previous published milestone is `v0.9.0-alpha`" in readme
+    assert "current published milestone is `v0.9.0-alpha`" not in readme.lower()
+
+
+def test_beta_release_notes_remain_in_development_and_safety_scoped() -> None:
+    release_notes = (
+        PROJECT_ROOT / "docs/release-notes-v1.0.0-beta.md"
+    ).read_text(encoding="utf-8")
+    normalized_notes = " ".join(release_notes.lower().split())
+
+    assert "`v1.0.0-beta` is in development" in normalized_notes
+    assert "not yet published as a github release" in normalized_notes
+    assert "not a production edr release" in normalized_notes
+    assert "no real ai or llm execution" in normalized_notes
+    assert "no external notification delivery" in normalized_notes
+    assert "no daemon, scheduler, background service" in normalized_notes
+    assert "no active network scanning" in normalized_notes
+    assert "no automatic remediation" in normalized_notes
+
+
+def test_beta_data_contract_documentation_preserves_existing_schemas() -> None:
+    contracts = (PROJECT_ROOT / "docs/data-contracts.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "exactly these five top-level fields" in contracts
+    for field_name in (
+        "report_id",
+        "report_type",
+        "generated_at",
+        "alert_count",
+        "alerts",
+    ):
+        assert f"- `{field_name}`" in contracts
+    assert "There is no top-level `explanations` field" in contracts
+    assert "does not add a top-level `schema_version`" in contracts
+    assert "notification summary is a separate artifact" in contracts.lower()
+    assert "`schema_version` remains the integer `1`" in contracts
+    assert "At most 20 alerts are included" in contracts
 
 
 def test_demo_uses_fixture_first_non_destructive_flow() -> None:

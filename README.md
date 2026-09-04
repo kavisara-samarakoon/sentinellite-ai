@@ -11,12 +11,12 @@ or perform automatic remediation.
 
 ## Status
 
-The current published milestone is `v0.9.0-alpha`. The active development target is
-`v1.0.0-beta`, a release-surface stabilization milestone rather than a feature release.
-The beta target is a stable local defensive CLI beta for authorized development,
-demonstration, and evaluation.
+The current version is `v1.0.0-beta`. It is in development and is not yet published as a
+GitHub release. The previous published milestone is `v0.9.0-alpha`. This beta is a
+release-surface stabilization milestone rather than a feature release and targets a stable
+local defensive CLI for authorized development, demonstration, and evaluation.
 
-The current implementation has 595 automated tests covering configuration, collectors,
+The automated suite covers configuration, collectors,
 normalization, detection, scoring, reporting, deterministic explanations, local report
 review, notification-summary export, packaging, and CLI behavior.
 
@@ -298,6 +298,9 @@ Historical milestone notes remain available for reference:
 - [v0.7.0-alpha](docs/release-notes-v0.7.0-alpha.md)
 - [v0.8.0-alpha](docs/release-notes-v0.8.0-alpha.md)
 - [v0.9.0-alpha](docs/release-notes-v0.9.0-alpha.md)
+
+The in-development beta notes are available at
+[v1.0.0-beta](docs/release-notes-v1.0.0-beta.md).
 
 ## License
 

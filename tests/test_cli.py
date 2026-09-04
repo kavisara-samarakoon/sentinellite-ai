@@ -1091,7 +1091,7 @@ def test_default_status_describes_on_demand_capabilities() -> None:
     result = runner.invoke(app)
 
     assert result.exit_code == 0
-    assert "SentinelLite AI v0.9.0-alpha" in result.stdout
+    assert "SentinelLite AI v1.0.0-beta" in result.stdout
     assert "Local Defensive Observation CLI" in result.stdout
     assert "SentinelLite AI status" in result.stdout
     assert "Status: AVAILABLE" in result.stdout
@@ -1154,7 +1154,7 @@ def test_version_option_exits_before_config_or_system_collection(
     result = runner.invoke(app, ["--version"])
 
     assert result.exit_code == 0
-    assert result.stdout == "SentinelLite AI v0.9.0-alpha\n"
+    assert result.stdout == "SentinelLite AI v1.0.0-beta\n"
     assert result.stderr == ""
 
 

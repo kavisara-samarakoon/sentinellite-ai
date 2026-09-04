@@ -53,6 +53,8 @@ sentinellite --help
 Both version commands must print the same version. The help output should describe a local
 defensive observation and report-review CLI, not a resident agent or service.
 
+For the current release candidate, both commands print `SentinelLite AI v1.0.0-beta`.
+
 ## 3. Show Local Status
 
 ```bash

@@ -1,6 +1,6 @@
 # SentinelLite AI Data Contracts
 
-This document describes the JSON written by the current SentinelLite AI beta surface. It
+This document describes the JSON written by the SentinelLite AI `v1.0.0-beta` surface. It
 documents existing behavior; it does not introduce or change a schema.
 
 Both artifact types are local files and may contain or imply operational security data.
