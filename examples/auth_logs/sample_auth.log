@@ -1,5 +1,5 @@
-Aug 16 12:30:01 ubuntu-arm64-lab sshd[1201]: Failed password for invalid user admin from 192.168.1.50 port 51244 ssh2
-Aug 16 12:31:10 ubuntu-arm64-lab sshd[1205]: Failed password for kavindu from 192.168.1.51 port 51245 ssh2
-Aug 16 12:32:15 ubuntu-arm64-lab sshd[1210]: Accepted password for kavindu from 192.168.1.52 port 51246 ssh2
-Aug 16 12:33:20 ubuntu-arm64-lab sudo:  kavindu : TTY=pts/0 ; PWD=/home/kavindu ; USER=root ; COMMAND=/usr/bin/apt update
+Aug 16 12:30:01 ubuntu-arm64-lab sshd[1201]: Failed password for invalid user admin from 192.0.2.50 port 51244 ssh2
+Aug 16 12:31:10 ubuntu-arm64-lab sshd[1205]: Failed password for demo-user from 192.0.2.51 port 51245 ssh2
+Aug 16 12:32:15 ubuntu-arm64-lab sshd[1210]: Accepted password for demo-user from 192.0.2.52 port 51246 ssh2
+Aug 16 12:33:20 ubuntu-arm64-lab sudo:  demo-user : TTY=pts/0 ; PWD=/home/demo-user ; USER=root ; COMMAND=/usr/bin/apt update
 Aug 16 12:34:22 ubuntu-arm64-lab systemd[1]: Started Daily apt download activities.

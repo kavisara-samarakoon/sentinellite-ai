@@ -65,7 +65,7 @@ def test_empty_source_raises_error() -> None:
 def test_auth_event_to_security_event() -> None:
     line = (
         "Aug 16 12:30:01 ubuntu-arm64-lab sshd[1201]: "
-        "Failed password for invalid user admin from 192.168.1.50 port 51244 ssh2"
+        "Failed password for invalid user admin from 192.0.2.50 port 51244 ssh2"
     )
 
     auth_event = parse_auth_line(line)
@@ -79,4 +79,4 @@ def test_auth_event_to_security_event() -> None:
     assert security_event.event_type == "ssh_failed_login"
     assert security_event.severity == "medium"
     assert security_event.evidence["username"] == "admin"
-    assert security_event.evidence["source_ip"] == "192.168.1.50"
+    assert security_event.evidence["source_ip"] == "192.0.2.50"

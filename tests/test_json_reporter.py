@@ -40,8 +40,8 @@ def create_sample_scored_alert() -> ScoredAlert:
         source="sshd",
         event_type="ssh_failed_login",
         severity="medium",
-        message="Failed SSH login attempt for user admin from 192.168.1.50",
-        evidence={"username": "admin", "source_ip": "192.168.1.50"},
+        message="Failed SSH login attempt for user admin from 192.0.2.50",
+        evidence={"username": "admin", "source_ip": "192.0.2.50"},
     )
 
     rule_match = detect_event(event)[0]

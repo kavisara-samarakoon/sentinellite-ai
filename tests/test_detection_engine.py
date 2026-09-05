@@ -73,8 +73,8 @@ def test_detect_failed_ssh_login_event() -> None:
         source="sshd",
         event_type="ssh_failed_login",
         severity="medium",
-        message="Failed SSH login attempt for user admin from 192.168.1.50",
-        evidence={"username": "admin", "source_ip": "192.168.1.50"},
+        message="Failed SSH login attempt for user admin from 192.0.2.50",
+        evidence={"username": "admin", "source_ip": "192.0.2.50"},
     )
 
     matches = detect_event(event)
@@ -93,8 +93,8 @@ def test_detect_successful_ssh_login_event() -> None:
         source="sshd",
         event_type="ssh_successful_login",
         severity="low",
-        message="Successful SSH login for user kavindu from 192.168.1.52",
-        evidence={"username": "kavindu", "source_ip": "192.168.1.52"},
+        message="Successful SSH login for user demo-user from 192.0.2.52",
+        evidence={"username": "demo-user", "source_ip": "192.0.2.52"},
     )
 
     matches = detect_event(event)
@@ -109,8 +109,8 @@ def test_detect_sudo_command_event() -> None:
         source="sudo",
         event_type="sudo_command",
         severity="medium",
-        message="User kavindu executed sudo command: /usr/bin/apt update",
-        evidence={"username": "kavindu", "source_ip": None},
+        message="User demo-user executed sudo command: /usr/bin/apt update",
+        evidence={"username": "demo-user", "source_ip": None},
     )
 
     matches = detect_event(event)
@@ -150,15 +150,15 @@ def test_detect_multiple_events_from_auth_log_lines() -> None:
     lines = [
         (
             "Aug 16 12:30:01 ubuntu-arm64-lab sshd[1201]: "
-            "Failed password for invalid user admin from 192.168.1.50 port 51244 ssh2"
+            "Failed password for invalid user admin from 192.0.2.50 port 51244 ssh2"
         ),
         (
             "Aug 16 12:32:15 ubuntu-arm64-lab sshd[1210]: "
-            "Accepted password for kavindu from 192.168.1.52 port 51246 ssh2"
+            "Accepted password for demo-user from 192.0.2.52 port 51246 ssh2"
         ),
         (
-            "Aug 16 12:33:20 ubuntu-arm64-lab sudo:  kavindu : "
-            "TTY=pts/0 ; PWD=/home/kavindu ; USER=root ; COMMAND=/usr/bin/apt update"
+            "Aug 16 12:33:20 ubuntu-arm64-lab sudo:  demo-user : "
+            "TTY=pts/0 ; PWD=/home/demo-user ; USER=root ; COMMAND=/usr/bin/apt update"
         ),
     ]
 

@@ -14,7 +14,7 @@ from sentinellite.collectors.auth_sources import (
 def test_parse_failed_ssh_login() -> None:
     line = (
         "Aug 16 12:30:01 ubuntu-arm64-lab sshd[1201]: "
-        "Failed password for invalid user admin from 192.168.1.50 port 51244 ssh2"
+        "Failed password for invalid user admin from 192.0.2.50 port 51244 ssh2"
     )
 
     event = parse_auth_line(line)
@@ -23,13 +23,13 @@ def test_parse_failed_ssh_login() -> None:
     assert event.event_type == "ssh_failed_login"
     assert event.source == "sshd"
     assert event.username == "admin"
-    assert event.source_ip == "192.168.1.50"
+    assert event.source_ip == "192.0.2.50"
 
 
 def test_parse_successful_ssh_login() -> None:
     line = (
         "Aug 16 12:32:15 ubuntu-arm64-lab sshd[1210]: "
-        "Accepted password for kavindu from 192.168.1.52 port 51246 ssh2"
+        "Accepted password for demo-user from 192.0.2.52 port 51246 ssh2"
     )
 
     event = parse_auth_line(line)
@@ -37,14 +37,14 @@ def test_parse_successful_ssh_login() -> None:
     assert isinstance(event, AuthEvent)
     assert event.event_type == "ssh_successful_login"
     assert event.source == "sshd"
-    assert event.username == "kavindu"
-    assert event.source_ip == "192.168.1.52"
+    assert event.username == "demo-user"
+    assert event.source_ip == "192.0.2.52"
 
 
 def test_parse_sudo_command() -> None:
     line = (
-        "Aug 16 12:33:20 ubuntu-arm64-lab sudo:  kavindu : "
-        "TTY=pts/0 ; PWD=/home/kavindu ; USER=root ; COMMAND=/usr/bin/apt update"
+        "Aug 16 12:33:20 ubuntu-arm64-lab sudo:  demo-user : "
+        "TTY=pts/0 ; PWD=/home/demo-user ; USER=root ; COMMAND=/usr/bin/apt update"
     )
 
     event = parse_auth_line(line)
@@ -52,7 +52,7 @@ def test_parse_sudo_command() -> None:
     assert isinstance(event, AuthEvent)
     assert event.event_type == "sudo_command"
     assert event.source == "sudo"
-    assert event.username == "kavindu"
+    assert event.username == "demo-user"
     assert event.source_ip is None
     assert "/usr/bin/apt update" in event.message
 
@@ -200,7 +200,7 @@ def test_unrelated_only_readable_auth_log_returns_no_events(tmp_path: Path) -> N
 def test_auth_event_to_dict() -> None:
     line = (
         "Aug 16 12:32:15 ubuntu-arm64-lab sshd[1210]: "
-        "Accepted password for kavindu from 192.168.1.52 port 51246 ssh2"
+        "Accepted password for demo-user from 192.0.2.52 port 51246 ssh2"
     )
 
     event = parse_auth_line(line)
@@ -210,5 +210,5 @@ def test_auth_event_to_dict() -> None:
     event_dict = event.to_dict()
 
     assert event_dict["event_type"] == "ssh_successful_login"
-    assert event_dict["username"] == "kavindu"
-    assert event_dict["source_ip"] == "192.168.1.52"
+    assert event_dict["username"] == "demo-user"
+    assert event_dict["source_ip"] == "192.0.2.52"

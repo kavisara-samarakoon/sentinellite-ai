@@ -62,7 +62,7 @@ def test_collect_processes_skips_inaccessible_processes(monkeypatch):
             {
                 "pid": 321,
                 "name": "python",
-                "username": "kavisara",
+                "username": "test-user",
                 "exe": "/usr/bin/python3",
                 "cmdline": ["python3", "main.py"],
                 "cpu_percent": 2.0,
