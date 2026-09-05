@@ -8,6 +8,14 @@ production EDR behavior.
 
 ## Setup
 
+macOS and Ubuntu/Linux contributors can use the same virtual-environment workflow below.
+Python 3.11 or newer is required. On Ubuntu, install `python3-venv` first if
+`python3 -m venv` is unavailable:
+
+```bash
+sudo apt install python3-venv
+```
+
 From a cloned repository, create an isolated environment and install the development tools:
 
 ```bash

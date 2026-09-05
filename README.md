@@ -11,10 +11,13 @@ or perform automatic remediation.
 
 ## Status
 
-The current version is `v1.0.0-beta`. It is in development and is not yet published as a
-GitHub release. The previous published milestone is `v0.9.0-alpha`. This beta is a
-release-surface stabilization milestone rather than a feature release and targets a stable
-local defensive CLI for authorized development, demonstration, and evaluation.
+The current version is `v1.0.0-beta`, and it is the current release. It is published as a
+[GitHub pre-release](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.0.0-beta).
+It is beta-stage software and is not a production EDR. The package is not published to
+PyPI. The previous published milestone is `v0.9.0-alpha`.
+
+This replaces the earlier status that `v1.0.0-beta` was not yet published as a
+GitHub release; that statement is no longer current.
 
 The automated suite covers configuration, collectors,
 normalization, detection, scoring, reporting, deterministic explanations, local report
@@ -45,16 +48,53 @@ See the [security policy](SECURITY.md) for the full scope.
 ## Requirements
 
 - Python 3.11 or newer
-- Git
 - A Python virtual environment
+- Git for development installation from source
 - Linux for the target observation environment; macOS is supported for development checks
 
-The package is not published to PyPI. Install it from a trusted clone or a separately
-verified local release artifact.
+The package is not published to PyPI. Install it from the published GitHub release artifacts
+or from a trusted source checkout.
 
-## Installation
+## Install from GitHub Release
 
-Clone the repository and create an isolated development environment:
+For a normal user installation, download both
+`sentinellite_ai-1.0.0b0-py3-none-any.whl` and `SHA256SUMS.txt` from the
+[v1.0.0-beta release page](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.0.0-beta).
+Verify the downloaded wheel against `SHA256SUMS.txt`, then open a terminal in the download
+directory and install it into an isolated environment:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install ./sentinellite_ai-1.0.0b0-py3-none-any.whl
+sentinellite --version
+```
+
+The version command should display `SentinelLite AI v1.0.0-beta`.
+
+### macOS
+
+Python 3.11 or newer is required. A current Python installation from Homebrew or
+[python.org](https://www.python.org/downloads/macos/) can be used. The commands above work in
+the standard `zsh` or `bash` shells.
+
+### Ubuntu and Linux
+
+Python 3.11 or newer is required. If virtual-environment support is missing on Ubuntu,
+install the `python3-venv` package before running `python3 -m venv .venv`:
+
+```bash
+sudo apt install python3-venv
+```
+
+Authentication-log observation is Linux-targeted. It remains explicit and on demand; the
+CLI does not automatically read or scan host authentication logs.
+
+## Development Install from Source
+
+Clone the repository and create an isolated development environment with the quality and
+test tools:
 
 ```bash
 git clone https://github.com/kavisara-samarakoon/sentinellite-ai.git
@@ -66,7 +106,7 @@ python -m pip install -e ".[dev]"
 python -m pip check
 ```
 
-For a local installation without the development tools, use:
+For an editable source installation without the development tools, use:
 
 ```bash
 python -m pip install -e .
@@ -99,7 +139,8 @@ starting a scan:
 sentinellite auth-sources list
 ```
 
-Run a deterministic demonstration against a bundled, non-sensitive fixture:
+From a source checkout, run a deterministic demonstration against a bundled, non-sensitive
+fixture:
 
 ```bash
 sentinellite scan-auth examples/auth_logs/sample_ubuntu_auth.log
@@ -299,7 +340,7 @@ Historical milestone notes remain available for reference:
 - [v0.8.0-alpha](docs/release-notes-v0.8.0-alpha.md)
 - [v0.9.0-alpha](docs/release-notes-v0.9.0-alpha.md)
 
-The in-development beta notes are available at
+The published beta notes are available at
 [v1.0.0-beta](docs/release-notes-v1.0.0-beta.md).
 
 ## License
