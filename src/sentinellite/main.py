@@ -1,4 +1,5 @@
 import platform
+import shlex
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Annotated, Any
@@ -19,10 +20,12 @@ from sentinellite.collectors.system import SystemInfo, collect_system_info
 from sentinellite.config import SentinelLiteConfig, default_config, write_default_config
 from sentinellite.config.loader import ConfigError, load_config
 from sentinellite.detection.rules import DetectionRule, active_rules_from_disabled_ids
+from sentinellite.doctor import run_doctor
 from sentinellite.explanations.cli import build_explanation_panels
 from sentinellite.explanations.evidence import build_alert_evidence_summary
 from sentinellite.explanations.generator import generate_alert_explanation
 from sentinellite.pipeline.auth_scan import run_auth_scan
+from sentinellite.pipeline.demo import run_demo
 from sentinellite.pipeline.file_integrity_baseline_scan import (
     create_file_integrity_baseline,
     run_file_integrity_baseline_scan,
@@ -314,6 +317,84 @@ def main(
 
     if ctx.invoked_subcommand is None:
         show_status(_selected_config(ctx))
+
+
+@app.command("demo")
+def demo_command(
+    ctx: typer.Context,
+    output_dir: Annotated[
+        Path | None,
+        typer.Option("--output-dir", help="Directory for the synthetic demo JSON report."),
+    ] = None,
+) -> None:
+    """Generate a local report using only bundled synthetic authentication records."""
+    effective_output_dir, include_explanations = _reporting_options(ctx, output_dir, None)
+    console.print(
+        "Synthetic fixture demo: uses built-in rules; no real logs, process/network/file "
+        "observation, or network traffic."
+    )
+    try:
+        summary, _ = run_demo(
+            output_dir=effective_output_dir,
+            include_explanations=include_explanations,
+        )
+    except OSError as error:
+        console.print(_literal_text(f"[!] Demo failed: {error}", style="red"))
+        raise typer.Exit(code=1) from error
+
+    console.print(
+        _literal_text(
+            f"[+] Demo complete: {summary.auth_events_count} synthetic events, "
+            f"{summary.scored_alerts_count} alerts. These are examples for report review.",
+            style="green",
+        )
+    )
+    console.print(_literal_text(f"Saved report: {summary.report_path}"), soft_wrap=True)
+    list_command = "sentinellite reports list"
+    if effective_output_dir != Path("reports"):
+        list_command += f" --report-dir {shlex.quote(str(effective_output_dir))}"
+    console.print("Next commands:")
+    console.print(_literal_text(f"  {list_command}"), soft_wrap=True)
+    console.print(
+        _literal_text(f"  sentinellite reports show {shlex.quote(summary.report_path)}"),
+        soft_wrap=True,
+    )
+
+
+@app.command("doctor")
+def doctor_command(
+    ctx: typer.Context,
+    output_dir: Annotated[
+        Path | None,
+        typer.Option("--output-dir", help="Report output directory to check for write access."),
+    ] = None,
+) -> None:
+    """Check local installation readiness without scanning or network activity."""
+    effective_output_dir, _ = _reporting_options(ctx, output_dir, None)
+    console.print("SentinelLite doctor: local environment checks only; no root required.")
+    checks = run_doctor(effective_output_dir)
+    for check in checks:
+        style = {"PASS": "green", "WARNING": "yellow", "FAIL": "red"}[check.status]
+        console.print(
+            _literal_text(f"[{check.status}] {check.name}: {check.detail}", style=style),
+            soft_wrap=True,
+        )
+
+    counts = {
+        status: sum(check.status == status for check in checks)
+        for status in ("PASS", "WARNING", "FAIL")
+    }
+    outcome = "FAIL" if counts["FAIL"] else "WARNING" if counts["WARNING"] else "PASS"
+    console.print(
+        _literal_text(
+            f"Summary: {outcome} — {counts['PASS']} passed, "
+            f"{counts['WARNING']} warning(s), {counts['FAIL']} failed."
+        ),
+        soft_wrap=True,
+    )
+    console.print("These checks describe installation readiness, not endpoint security.")
+    if counts["FAIL"]:
+        raise typer.Exit(code=1)
 
 
 @app.command("config-init")

@@ -3,6 +3,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from sentinellite.collectors.auth import (
+    AuthEvent,
     auth_event_to_security_event,
     collect_auth_events_from_file,
 )
@@ -35,8 +36,29 @@ def run_auth_scan(
 ) -> tuple[AuthScanSummary, list[ScoredAlert]]:
     auth_events = collect_auth_events_from_file(log_path)
 
+    return report_auth_events(
+        auth_events,
+        log_path=str(log_path),
+        output_dir=output_dir,
+        report_filename=report_filename,
+        include_explanations=include_explanations,
+        rules=rules,
+    )
+
+
+def report_auth_events(
+    auth_events: Sequence[AuthEvent],
+    *,
+    log_path: str,
+    output_dir: str | Path = "reports",
+    report_filename: str | None = None,
+    include_explanations: bool = False,
+    rules: Sequence[DetectionRule] | None = None,
+    host_id: str | None = None,
+) -> tuple[AuthScanSummary, list[ScoredAlert]]:
+    """Normalize, detect, score and report already supplied authentication events."""
     security_events = [
-        auth_event_to_security_event(auth_event)
+        auth_event_to_security_event(auth_event, host_id=host_id)
         for auth_event in auth_events
     ]
 

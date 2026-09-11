@@ -126,6 +126,34 @@ No `PYTHONPATH` setting is required after installation.
 
 ## Quick Start
 
+When using the development source for `v1.1.0-beta`, check the local installation and
+generate a synthetic report from any writable working directory:
+
+```bash
+sentinellite doctor
+sentinellite demo
+sentinellite reports list
+sentinellite reports show <REPORT_PATH>
+```
+
+Replace `<REPORT_PATH>` with the saved path printed by `demo`. These two new commands are
+available in the development source; the published `v1.0.0-beta` artifacts are unchanged.
+`demo` uses bundled in-memory records and built-in authentication rules. It reads no real
+logs, performs no process/network/file observation, and sends no network traffic. Its
+alerts are synthetic examples for report review. No root privileges are needed.
+
+`doctor` shows the CLI and Python versions, system and architecture, checks packaged
+defaults and dependency imports, and creates, writes, then removes a temporary file in
+the report directory. It leaves existing reports untouched. A failure exits with code 1;
+passes and warnings exit with code 0. Non-Linux systems receive a warning because endpoint
+observation targets Linux. Doctor checks installation readiness, not endpoint security.
+Like the other CLI commands, it needs Typer and Rich installed to start.
+
+Both commands accept `--output-dir PATH` and use the selected TOML reporting settings when
+no output override is given. Demo uses built-in rules regardless of module switches or
+disabled rule IDs, and honors `reporting.include_explanations` for deterministic stored
+explanations. Its suggested review commands include the selected report directory.
+
 Show the local CLI status:
 
 ```bash

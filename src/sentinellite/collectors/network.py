@@ -3,8 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-import psutil
-
 
 @dataclass(frozen=True, slots=True)
 class NetworkConnection:
@@ -41,6 +39,8 @@ def _split_address(address: Any) -> tuple[str | None, int | None]:
 
 def _get_process_name(pid: int | None) -> str | None:
     """Look up a process name when permissions and process lifetime allow it."""
+    import psutil
+
     if pid is None:
         return None
 
@@ -52,6 +52,8 @@ def _get_process_name(pid: int | None) -> str | None:
 
 def collect_network_connections() -> list[NetworkConnection]:
     """Collect active internet connections without changing network state."""
+    import psutil
+
     try:
         connections = psutil.net_connections(kind="inet")
     except (psutil.AccessDenied, psutil.NoSuchProcess, psutil.ZombieProcess):

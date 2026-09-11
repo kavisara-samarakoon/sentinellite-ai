@@ -10,6 +10,41 @@ contents, or rely on environment-dependent alert results.
 SentinelLite AI is an on-demand local defensive CLI, not a daemon, background monitor,
 production EDR, external notification service, or AI/LLM system.
 
+## Development Source Shortcut for v1.1.0-beta
+
+After installing the development source, run these commands from a writable directory:
+
+```bash
+sentinellite doctor
+sentinellite demo
+sentinellite reports list
+sentinellite reports show <REPORT_PATH>
+```
+
+Use the saved report path printed by `demo` in place of `<REPORT_PATH>`. The demo fixture
+is included in the Python package, so the working directory does not need to be a source
+checkout. It processes three synthetic authentication records in memory using the normal
+normalization, detection, scoring and JSON report pipeline. It uses built-in rules even
+when observation modules or rules are disabled in a selected config. The report schema
+is unchanged; examples are for learning report review and do not describe the real host.
+
+`doctor` checks local versions, system, architecture, packaged default configuration,
+dependency imports and report-directory write access. It creates the directory if needed,
+writes a uniquely named temporary file, then removes that file without changing existing
+reports. FAIL means exit code 1; PASS and WARNING mean exit code 0. A non-Linux platform
+produces a warning about the target observation environment, without blocking the demo.
+These are installation checks, not an assessment of endpoint security.
+Typer and Rich must be installed for the CLI, including doctor, to start.
+
+Neither command reads system logs, observes processes, connections or file integrity,
+sends network traffic, or requires root. `--output-dir PATH` overrides the report directory
+for either command; otherwise they use the selected TOML reporting directory or `reports`.
+Demo also honors the TOML setting for stored deterministic explanations. Follow the review
+commands printed by `demo` when using a custom directory.
+
+These commands are development additions; the published `v1.0.0-beta` artifacts and package
+version are unchanged. The longer fixture walkthrough below remains available.
+
 ## Prerequisites
 
 - A trusted clone of the repository

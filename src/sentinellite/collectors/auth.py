@@ -121,7 +121,7 @@ def collect_auth_events_from_file(log_path: str | Path) -> list[AuthEvent]:
     return events
 
 
-def auth_event_to_security_event(auth_event: AuthEvent):
+def auth_event_to_security_event(auth_event: AuthEvent, *, host_id: str | None = None):
     from sentinellite.models.security_event import create_security_event
 
     severity_map = {
@@ -141,4 +141,5 @@ def auth_event_to_security_event(auth_event: AuthEvent):
             "original_timestamp": auth_event.timestamp,
         },
         raw_data=auth_event.raw_line,
+        host_id=host_id,
     )

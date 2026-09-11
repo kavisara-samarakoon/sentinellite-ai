@@ -14,6 +14,8 @@ EXPECTED_COMMANDS = {
     "auth-sources",
     "baseline-files",
     "config-init",
+    "demo",
+    "doctor",
     "reports",
     "scan-auth",
     "scan-files",
@@ -193,3 +195,67 @@ def test_installed_console_fixture_scan_preserves_separate_schemas(
         "report_id": report["report_id"],
         "generated_at": report["generated_at"],
     }
+
+
+@pytest.mark.parametrize("command", [CONSOLE_COMMAND, MODULE_COMMAND])
+def test_onboarding_entry_points_work_outside_checkout(
+    command: tuple[str, ...],
+    tmp_path: Path,
+) -> None:
+    doctor = run_entry_point(command, "doctor", cwd=tmp_path)
+    assert doctor.returncode == 0, doctor.stdout + doctor.stderr
+    assert "0 failed" in doctor.stdout
+    assert list((tmp_path / "reports").iterdir()) == []
+
+    demo = run_entry_point(command, "demo", cwd=tmp_path)
+    assert demo.returncode == 0, demo.stdout + demo.stderr
+    assert "Demo complete" in demo.stdout
+    report_path, = (tmp_path / "reports").glob("*.json")
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert set(report) == REPORT_KEYS
+    assert report["alert_count"] == 3
+
+    reviewed = run_entry_point(command, "reports", "show", str(report_path), cwd=tmp_path)
+    assert reviewed.returncode == 0, reviewed.stdout + reviewed.stderr
+    assert "SentinelLite Alert Report Summary" in reviewed.stdout
+    assert doctor.stderr == demo.stderr == reviewed.stderr == ""
+
+
+@pytest.mark.parametrize(("module_name", "display_name"), [("psutil", "psutil"), ("yaml", "PyYAML")])
+def test_doctor_can_start_with_a_missing_observation_or_config_dependency(
+    module_name: str,
+    display_name: str,
+    tmp_path: Path,
+) -> None:
+    # Block the import before the CLI is loaded, using a fresh interpreter so an
+    # already cached module cannot hide a startup dependency problem.
+    script = """
+import importlib.abc
+import sys
+
+missing = sys.argv[1]
+
+class MissingDependency(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path, target=None):
+        if fullname.split('.')[0] == missing:
+            raise ModuleNotFoundError('simulated missing dependency: ' + fullname)
+        return None
+
+sys.meta_path.insert(0, MissingDependency())
+sys.argv = ['sentinellite', 'doctor']
+from sentinellite.main import cli
+cli()
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", script, module_name],
+        cwd=tmp_path,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert f"[FAIL] Dependency {display_name}:" in result.stdout
+    assert "Summary: FAIL" in result.stdout
+    assert "[PASS] Dependency typer:" in result.stdout
+    assert result.stderr == ""
