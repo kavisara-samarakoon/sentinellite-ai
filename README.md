@@ -11,10 +11,10 @@ or perform automatic remediation.
 
 ## Status
 
-The current version is `v1.1.0-beta`, and it is the current published
-[GitHub pre-release](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.1.0-beta).
-See the [release notes](docs/release-notes-v1.1.0-beta.md) for the published assets and hashes.
-The previous published release was `v1.0.0-beta`.
+The current source version is `v1.2.0-beta`, prepared as a release candidate for the local
+static dashboard and ARM-SecNet lab validation milestone. The GitHub release and tag are
+pending; final wheel/sdist hashes are pending the final build. See the
+[release candidate notes](docs/release-notes-v1.2.0-beta.md) and [release history](#release-history).
 SentinelLite AI is beta-stage software, not a production EDR, and is not published to PyPI.
 
 The automated suite covers configuration, collectors,
@@ -55,22 +55,24 @@ or from a trusted source checkout.
 
 ## Install from GitHub Release
 
-For a normal user installation, download both
-`sentinellite_ai-1.1.0b0-py3-none-any.whl` and `SHA256SUMS.txt` from the
-[v1.1.0-beta release page](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.1.0-beta).
+The `v1.2.0-beta` GitHub release is pending. Use the [source installation](#development-install-from-source)
+to try the release candidate now. After release, download the expected
+`sentinellite_ai-1.2.0b0-py3-none-any.whl` and `SHA256SUMS.txt` from its GitHub release page.
 Verify the downloaded wheel against `SHA256SUMS.txt`, then open a terminal in the download
-directory and install it into an isolated environment:
+directory and install it into an isolated environment. These wheel commands are for use
+after release:
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install ./sentinellite_ai-1.1.0b0-py3-none-any.whl
+python -m pip install ./sentinellite_ai-1.2.0b0-py3-none-any.whl
 sentinellite --version
 ```
 
-The version command should display `SentinelLite AI v1.1.0-beta`.
-This wheel includes `doctor` and `demo` for local installation checks and a synthetic demo.
+The expected version output is `SentinelLite AI v1.2.0-beta`. The release candidate includes
+`doctor`, `demo`, and `dashboard export` for local installation checks, a synthetic demo,
+and static report review.
 
 ### macOS
 
@@ -93,12 +95,12 @@ CLI does not automatically read or scan host authentication logs.
 ## Development Install from Source
 
 Clone the repository and create an isolated development environment with the quality and
-test tools:
+test tools. Until the release candidate is merged, select its preparation branch:
 
 ```bash
 git clone https://github.com/kavisara-samarakoon/sentinellite-ai.git
 cd sentinellite-ai
-git switch main
+git switch feature/v1.2-release-prep
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
@@ -126,19 +128,20 @@ No `PYTHONPATH` setting is required after installation.
 
 ## Quick Start
 
-With `v1.1.0-beta` installed, check the local installation and
-generate a synthetic report from any writable working directory:
+With the `v1.2.0-beta` release candidate installed, check the local installation,
+generate a synthetic report, and export a static dashboard from a writable working directory:
 
 ```bash
 sentinellite doctor
 sentinellite demo
+sentinellite dashboard export
 sentinellite reports list
 sentinellite reports show <REPORT_PATH>
 ```
 
-Replace `<REPORT_PATH>` with the saved path printed by `demo`. Both commands are included
-in the published `v1.1.0-beta` wheel and current source. The previous `v1.0.0-beta` wheel
-did not include them.
+Replace `<REPORT_PATH>` with the saved path printed by `demo`. The dashboard reads existing
+local JSON reports from `reports` by default and saves `reports/dashboard.html`. It performs
+no new observation and leaves source reports unchanged.
 `demo` uses bundled in-memory records and built-in authentication rules. It reads no real
 logs, performs no process/network/file observation, and sends no network traffic. Its
 alerts are synthetic examples for report review. No root privileges are needed.
@@ -150,7 +153,7 @@ passes and warnings exit with code 0. Non-Linux systems receive a warning becaus
 observation targets Linux. Doctor checks installation readiness, not endpoint security.
 Like the other CLI commands, it needs Typer and Rich installed to start.
 
-Both commands accept `--output-dir PATH` and use the selected TOML reporting settings when
+`doctor` and `demo` accept `--output-dir PATH` and use the selected TOML reporting settings when
 no output override is given. Demo uses built-in rules regardless of module switches or
 disabled rule IDs, and honors `reporting.include_explanations` for deterministic stored
 explanations. Its suggested review commands include the selected report directory.
@@ -182,13 +185,14 @@ See the [demo guide](docs/demo-guide.md) for the complete fixture-to-report work
 For an authorized Ubuntu ARM64 VM on Apple Silicon / UTM, see the
 [ARM-SecNet integration guide](docs/integrations/arm-secnet.md). It covers installing
 SentinelLite AI as an optional local CLI, starting with `sentinellite doctor` and
-`sentinellite demo` in `v1.1.0-beta`, and reviewing the resulting report.
+`sentinellite demo`, then exporting a local static dashboard. Lab 03 runtime evidence is
+recorded separately for one Ubuntu 26.04 LTS `aarch64` VM using source commit `d1775f0`.
+This does not prove universal ARM64 compatibility or validation of the exact release candidate.
 The projects remain separate repositories with no runtime dependency between them.
 
-### Local Static Dashboard (Development Source)
+### Local Static Dashboard
 
-The `feature/v1.2-dashboard-lab-validation` source includes a static dashboard exporter;
-it is not part of the published `v1.1.0-beta` wheel. From that source installation, run:
+The static dashboard exporter is included in the `v1.2.0-beta` release candidate. Run:
 
 ```bash
 sentinellite dashboard export --reports-dir reports --output reports/dashboard.html --limit 25
@@ -386,7 +390,7 @@ Ubuntu ARM64 results and their limitations are recorded in the
 - No automatic auth-source or config discovery
 - No journald or compressed rotated-log input
 - No recursive file integrity scan
-- No live dashboard, database, persistent report index, or filters; development source
+- No live dashboard, database, persistent report index, or filters; the release candidate
   provides a static HTML report exporter only
 - No external notification delivery or provider configuration
 - No real AI or LLM execution
@@ -395,6 +399,9 @@ Ubuntu ARM64 results and their limitations are recorded in the
 - No PyPI publication
 
 ## Release History
+
+The [v1.2.0-beta release candidate notes](docs/release-notes-v1.2.0-beta.md) describe the
+prepared source milestone; its GitHub release is pending.
 
 Historical milestone notes remain available for reference:
 
@@ -408,9 +415,11 @@ Historical milestone notes remain available for reference:
 - [v0.8.0-alpha](docs/release-notes-v0.8.0-alpha.md)
 - [v0.9.0-alpha](docs/release-notes-v0.9.0-alpha.md)
 
-The current published beta notes are available at
-[v1.1.0-beta](docs/release-notes-v1.1.0-beta.md). Previous beta notes remain available at
-[v1.0.0-beta](docs/release-notes-v1.0.0-beta.md).
+The latest published GitHub pre-release remains
+[v1.1.0-beta](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.1.0-beta)
+([release notes](docs/release-notes-v1.1.0-beta.md)); its wheel predates the dashboard exporter.
+The previous published release was `v1.0.0-beta`
+([release notes](docs/release-notes-v1.0.0-beta.md)).
 
 ## License
 

@@ -3,22 +3,24 @@
 ## Purpose
 
 This is the deterministic golden path for demonstrating the SentinelLite AI
-`v1.1.0-beta` release surface. It uses bundled, non-sensitive authentication fixtures and isolated
+`v1.2.0-beta` release candidate surface. It uses bundled, non-sensitive authentication fixtures and isolated
 temporary output. It does not require elevated privileges, read real authentication-log
 contents, or rely on environment-dependent alert results.
 
 SentinelLite AI is an on-demand local defensive CLI, not a daemon, background monitor,
 production EDR, external notification service, or AI/LLM system.
 
-## Safe Demo Shortcut for v1.1.0-beta
+## Safe Demo Shortcut for v1.2.0-beta
 
-Install the published `v1.1.0-beta` wheel or current source from `main` using the
-[README installation instructions](../README.md#install-from-github-release).
+Install the `v1.2.0-beta` release candidate from `feature/v1.2-release-prep` using the
+[README source instructions](../README.md#development-install-from-source).
+The GitHub release is pending; use its wheel only after release.
 Run these commands from a writable directory:
 
 ```bash
 sentinellite doctor
 sentinellite demo
+sentinellite dashboard export
 sentinellite reports list
 sentinellite reports show <REPORT_PATH>
 ```
@@ -38,14 +40,20 @@ produces a warning about the target observation environment, without blocking th
 These are installation checks, not an assessment of endpoint security.
 Typer and Rich must be installed for the CLI, including doctor, to start.
 
-Neither command reads system logs, observes processes, connections or file integrity,
-sends network traffic, or requires root. `--output-dir PATH` overrides the report directory
+`doctor` and `demo` do not read system logs, observe processes, connections or file integrity,
+send network traffic, or require root. `--output-dir PATH` overrides the report directory
 for either command; otherwise they use the selected TOML reporting directory or `reports`.
 Demo also honors the TOML setting for stored deterministic explanations. Follow the review
 commands printed by `demo` when using a custom directory.
 
-These commands are included in `v1.1.0-beta`. The published `v1.0.0-beta` wheel does not
-include them. The longer fixture walkthrough below remains available from the source checkout.
+`dashboard export` is included in the `v1.2.0-beta` release candidate. It reads existing
+local JSON reports only, leaving those reports unchanged, and writes standalone static HTML
+at `reports/dashboard.html` by default. It performs no observation or scanning and uses no
+server, browser auto-open, external scripts/assets, network requests, live monitoring, or
+automatic remediation. Open the saved file manually for offline review. For a custom demo
+directory, pass that same path with `dashboard export --reports-dir PATH`.
+
+The longer fixture walkthrough below remains available from the source checkout.
 
 ## Prerequisites
 
@@ -90,7 +98,7 @@ sentinellite --help
 Both version commands must print the same version. The help output should describe a local
 defensive observation and report-review CLI, not a resident agent or service.
 
-For the current release, both commands print `SentinelLite AI v1.1.0-beta`.
+For this release candidate, both commands print `SentinelLite AI v1.2.0-beta`.
 
 ## 3. Show Local Status
 
@@ -163,6 +171,16 @@ sentinellite reports show "$report_path"
 Because `report_dir` was fresh and the fixture scan writes one report, this resolves one
 path. `reports show` does not print alert evidence or raw JSON by default and does not
 regenerate stored explanations.
+
+### Export the Static Dashboard
+
+```bash
+sentinellite dashboard export --reports-dir "$report_dir" \
+  --output "$demo_root/dashboard.html" --limit 25
+```
+
+This reads only the saved local JSON reports. Open the printed HTML path manually to review
+summary cards, breakdowns, and alert/report tables offline. Raw evidence is omitted.
 
 ## 7. Export a Local Notification Summary
 

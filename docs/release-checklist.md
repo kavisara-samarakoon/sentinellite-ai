@@ -4,10 +4,11 @@ Use this checklist for the exact commit proposed for a SentinelLite AI GitHub pr
 The checklist verifies the existing local defensive CLI; it does not authorize new product
 capabilities or publication to PyPI.
 
-For the published `v1.1.0-beta` release, the CLI display version is `1.1.0-beta` and the
-normalized Python package version is `1.1.0b0`. Its publication details are recorded in the
-[release notes](release-notes-v1.1.0-beta.md). Reuse the gates below for future releases;
-the unchecked boxes are a checklist template, not the current release status.
+For the `v1.2.0-beta` release candidate, the CLI display version is `1.2.0-beta` and the
+normalized Python package version is `1.2.0b0`. See the
+[release candidate notes](release-notes-v1.2.0-beta.md). GitHub release and tag are pending;
+wheel/sdist hashes remain pending final build. The unchecked gates below must be recorded
+against the exact candidate before publication.
 
 ## 1. Scope and Source State
 
@@ -30,8 +31,8 @@ source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 python -m pip check
-ruff check --no-cache src tests
-PYTHONDONTWRITEBYTECODE=1 pytest -p no:cacheprovider
+python -m ruff check --no-cache src tests
+PYTHONDONTWRITEBYTECODE=1 python -m pytest -q -p no:cacheprovider
 git diff --check
 ```
 
@@ -53,7 +54,8 @@ sentinellite
 python -m sentinellite
 ```
 
-- [ ] Console and module entry points display the intended release version exactly.
+- [ ] Console and module entry points both display `SentinelLite AI v1.2.0-beta` exactly.
+- [ ] Installed package metadata reports `1.2.0b0`, derived from `sentinellite.__version__`.
 - [ ] Both entry points expose the same command tree.
 - [ ] Bare status works outside the repository checkout.
 - [ ] Bare status uses an explicitly selected TOML config.
@@ -63,10 +65,10 @@ python -m sentinellite
 ## 4. Build and Isolated Install
 
 ```bash
-python -m build --wheel
+python -m build
 ```
 
-- [ ] Exactly one expected wheel is produced.
+- [ ] The final build produces the expected `1.2.0b0` wheel and sdist in a clean output directory.
 - [ ] Wheel metadata contains the normalized intended version.
 - [ ] The wheel contains Python package modules and `sentinellite/config/default.yaml`.
 - [ ] The wheel contains the MIT License metadata and license file.
@@ -109,7 +111,43 @@ sentinellite reports export-notification "$report_path" \
 - [ ] Notification export leaves the source report byte-for-byte unchanged.
 - [ ] Alert reports and notification summaries remain in separate directories.
 
+### Doctor, Synthetic Demo, and Dashboard Smoke
+
+Use another fresh directory so dashboard counts are independent of other fixture reports:
+
+```bash
+dashboard_root="$(mktemp -d /tmp/sentinellite-dashboard-check.XXXXXX)"
+sentinellite doctor --output-dir "$dashboard_root/reports"
+sentinellite demo --output-dir "$dashboard_root/reports"
+sentinellite dashboard export --help
+sentinellite dashboard export --reports-dir "$dashboard_root/reports" \
+  --output "$dashboard_root/dashboard.html" --limit 25
+test -s "$dashboard_root/dashboard.html"
+```
+
+- [ ] Doctor checks local installation readiness; any platform warning is recorded.
+- [ ] Demo uses only synthetic data and produces 3 synthetic events and 3 alerts.
+- [ ] Dashboard shows 1 loaded report, 3 alerts, and highest severity medium.
+- [ ] The saved HTML opens manually as a local file, with no server or browser auto-open.
+- [ ] Dashboard export reads only existing local reports and leaves them unchanged.
+- [ ] No external scripts/assets, network requests, live monitoring, or remediation occur.
+- [ ] Regression tests cover empty input, invalid reports, and HTML escaping.
+
 ## 6. Platform Validation
+
+### ARM-SecNet Evidence Cross-check
+
+- [ ] Cross-check the separate [Lab 03 evidence record](https://github.com/kavisara-samarakoon/arm-secnet/blob/d3d9a7153939f58ebe9c08215ea4211c65472595/docs/evidence/v1.1-sentinellite-dashboard.md).
+- [ ] Record its scope: one Ubuntu 26.04 LTS `aarch64` VM running SentinelLite source commit
+      `d1775f0ca09d714f5ed9d681af90f216c1c39e8e`, before the candidate version bump.
+- [ ] Confirm doctor: 10 passed, 0 warnings, 0 failed; demo: 3 synthetic events, 3 alerts;
+      dashboard: local static HTML generated from local JSON reports.
+- [ ] Confirm ARM-SecNet documentation/evidence validation after merge: 29 passed,
+      0 warnings, 0 failures. These are documentation/evidence checks, not SentinelLite tests.
+- [ ] State that this evidence does not prove universal ARM64 compatibility or validate the
+      exact candidate commit. Both projects remain separate with no runtime dependency.
+
+### Exact Candidate Checks
 
 - [ ] Final macOS development validation passes on the exact candidate source state.
 - [ ] Final Ubuntu ARM64 validation passes on the exact candidate source state.
@@ -129,6 +167,10 @@ sentinellite reports export-notification "$report_path" \
 - [ ] The GitHub release is marked as a pre-release.
 - [ ] The release is not published to PyPI as part of this checklist.
 - [ ] Uploaded artifacts were built from the tagged commit.
-- [ ] SHA-256 checksums are published for every attached artifact.
+- [ ] After the final build, collect wheel/sdist SHA-256 hashes and the `SHA256SUMS.txt`
+      asset digest; these remain pending during candidate preparation.
+- [ ] Verify attached artifacts against those final hashes and publish their checksums.
+- [ ] Replace pending release status only after the release exists, recording its actual
+      publication timestamp and reviewed tag commit.
 - [ ] A fresh environment can install the uploaded wheel and pass the isolated smoke checks.
 - [ ] No tag or release is created until every mandatory gate above is complete.

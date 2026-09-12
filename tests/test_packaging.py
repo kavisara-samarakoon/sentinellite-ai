@@ -25,8 +25,8 @@ def test_package_version_has_single_expected_source() -> None:
     project = pyproject["project"]
     setuptools_config = pyproject["tool"]["setuptools"]
 
-    assert __version__ == "1.1.0-beta"
-    assert metadata.version("sentinellite-ai") == "1.1.0b0"
+    assert __version__ == "1.2.0-beta"
+    assert metadata.version("sentinellite-ai") == "1.2.0b0"
     assert project["dynamic"] == ["version"]
     assert "version" not in project
     assert setuptools_config["dynamic"]["version"] == {

@@ -11,6 +11,8 @@ CURRENT_DOCUMENTS = (
     PROJECT_ROOT / "docs/data-contracts.md",
     PROJECT_ROOT / "docs/release-checklist.md",
     PROJECT_ROOT / "docs/release-notes-v1.1.0-beta.md",
+    PROJECT_ROOT / "docs/release-notes-v1.2.0-beta.md",
+    PROJECT_ROOT / "docs/integrations/arm-secnet.md",
 )
 MARKDOWN_LINK_PATTERN = re.compile(r"\[[^]]+\]\(([^)]+)\)")
 
@@ -35,26 +37,28 @@ def test_readme_exposes_current_install_and_release_documents() -> None:
     assert "docs/data-contracts.md" in readme
     assert "docs/release-checklist.md" in readme
     assert "production EDR" in readme
-    assert "The current version is `v1.1.0-beta`" in readme
-    assert "current published\n[GitHub pre-release]" in readme
+    assert "The current source version is `v1.2.0-beta`" in readme
+    assert "docs/release-notes-v1.2.0-beta.md" in readme
+    assert "release candidate" in readme
+    assert "The `v1.2.0-beta` GitHub release is pending" in readme
     assert "releases/tag/v1.1.0-beta" in readme
     assert "previous published release was `v1.0.0-beta`" in readme
-    assert "not yet published" not in readme.lower()
-    assert "release candidate" not in readme.lower()
     assert "current published milestone is `v0.9.0-alpha`" not in readme.lower()
 
 
-def test_beta_release_notes_are_published_and_safety_scoped() -> None:
+def test_beta_release_notes_are_candidate_and_safety_scoped() -> None:
     release_notes = (
-        PROJECT_ROOT / "docs/release-notes-v1.1.0-beta.md"
+        PROJECT_ROOT / "docs/release-notes-v1.2.0-beta.md"
     ).read_text(encoding="utf-8")
     normalized_notes = " ".join(release_notes.lower().split())
 
-    assert "`v1.1.0-beta` is published as a github pre-release" in normalized_notes
-    assert "releases/tag/v1.1.0-beta" in release_notes
-    assert "e816a0a40efa24e98ccf3616cefe510d252c3656" in release_notes
-    assert "not yet published" not in normalized_notes
-    assert "release candidate" not in normalized_notes
+    assert "## Release candidate status" in release_notes
+    assert "GitHub release: pending" in release_notes
+    assert "Tag: pending" in release_notes
+    assert "Wheel/sdist hashes: pending final build" in release_notes
+    assert "sentinellite dashboard export" in release_notes
+    assert "d1775f0ca09d714f5ed9d681af90f216c1c39e8e" in release_notes
+    assert "does not prove universal arm64" in normalized_notes
     assert "not a production edr release" in normalized_notes
     assert "no real ai or llm execution" in normalized_notes
     assert "no external notification delivery" in normalized_notes
