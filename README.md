@@ -176,6 +176,14 @@ sentinellite scan-auth examples/auth_logs/sample_ubuntu_auth.log
 
 See the [demo guide](docs/demo-guide.md) for the complete fixture-to-report workflow.
 
+### ARM-SecNet Lab
+
+For an authorized Ubuntu ARM64 VM on Apple Silicon / UTM, see the
+[ARM-SecNet integration guide](docs/integrations/arm-secnet.md). It covers installing
+SentinelLite AI as an optional local CLI, starting with `sentinellite doctor` and
+`sentinellite demo` from the development source, and reviewing the resulting report.
+The projects remain separate repositories with no runtime dependency between them.
+
 ## Explicit TOML Configuration
 
 Create a default TOML file at an explicit path:
