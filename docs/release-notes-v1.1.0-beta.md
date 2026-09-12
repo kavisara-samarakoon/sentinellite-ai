@@ -48,8 +48,7 @@ Before release, install from `feature/v1.1-product-usability`. After release, th
   receive a warning because endpoint observation targets Linux.
 - Typer and Rich must be installed for the CLI, including doctor, to start. Missing
   `psutil` or PyYAML can be reported by doctor without preventing CLI startup.
-- Existing scan and report-review behavior remains unchanged. This candidate preparation
-  changes no runtime behavior beyond the version display.
+- Existing scan and report-review behavior remains unchanged. New runtime behavior is limited to the `doctor`/`demo` onboarding commands and the version display.
 - The JSON report schema is unchanged: the top-level fields remain `report_id`,
   `report_type`, `generated_at`, `alert_count`, and `alerts`. Optional explanations remain
   nested in individual alerts. The separate local notification-summary schema is unchanged.
