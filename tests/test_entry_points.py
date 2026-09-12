@@ -16,6 +16,7 @@ EXPECTED_COMMANDS = {
     "auth-sources",
     "baseline-files",
     "config-init",
+    "dashboard",
     "demo",
     "doctor",
     "reports",
@@ -61,6 +62,21 @@ def run_entry_point(
 
 def test_console_script_is_installed() -> None:
     assert CONSOLE_SCRIPT.is_file()
+
+
+@pytest.mark.parametrize("command", [CONSOLE_COMMAND, MODULE_COMMAND])
+def test_dashboard_export_entry_points_work_outside_checkout(
+    command: tuple[str, ...],
+    tmp_path: Path,
+) -> None:
+    result = run_entry_point(command, "dashboard", "export", cwd=tmp_path)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    output = tmp_path / "reports" / "dashboard.html"
+    assert output.is_file()
+    assert "SentinelLite AI Local Dashboard" in output.read_text(encoding="utf-8")
+    assert "Saved dashboard: reports/dashboard.html" in result.stdout
+    assert result.stderr == ""
 
 
 def test_entry_point_versions_agree_outside_checkout(tmp_path: Path) -> None:

@@ -185,6 +185,34 @@ SentinelLite AI as an optional local CLI, starting with `sentinellite doctor` an
 `sentinellite demo` in `v1.1.0-beta`, and reviewing the resulting report.
 The projects remain separate repositories with no runtime dependency between them.
 
+### Local Static Dashboard (Development Source)
+
+The `feature/v1.2-dashboard-lab-validation` source includes a static dashboard exporter;
+it is not part of the published `v1.1.0-beta` wheel. From that source installation, run:
+
+```bash
+sentinellite dashboard export --reports-dir reports --output reports/dashboard.html --limit 25
+```
+
+All three options have the defaults shown above. The command reads existing local JSON
+reports and prints the saved HTML path. Open the file manually to review it offline.
+There is no server, browser auto-open, observation, scanning, or network activity, and no
+external scripts, styles, fonts, or tracking. The HTML includes embedded CSS and escaped
+summary fields; raw evidence and raw log data are omitted.
+
+`--limit` must be positive. It caps the newest reports displayed and the combined alert
+table separately. The total reports loaded counts all compatible reports; alert counts,
+breakdowns, and highest severity describe only the displayed alerts. Times are shown in
+UTC; missing, invalid, or timezone-free times sort last, with report time used when an
+alert has no usable timestamp. Missing optional fields display a placeholder.
+
+Only regular `.json` files directly inside the selected directory are considered. Symlinks
+and subdirectories are ignored; malformed, incompatible, unreadable, or oversized reports
+are skipped. Each report is limited to 2 MB. A missing or empty reports directory produces
+an empty dashboard. The output parent directory is created if needed. Use an `.html` or
+`.htm` output path; output symlinks and JSON destinations are rejected. Existing dashboard
+HTML can be replaced safely while source reports remain unchanged.
+
 ## Explicit TOML Configuration
 
 Create a default TOML file at an explicit path:
@@ -358,7 +386,8 @@ Ubuntu ARM64 results and their limitations are recorded in the
 - No automatic auth-source or config discovery
 - No journald or compressed rotated-log input
 - No recursive file integrity scan
-- No dashboard, database, persistent report index, or filters
+- No live dashboard, database, persistent report index, or filters; development source
+  provides a static HTML report exporter only
 - No external notification delivery or provider configuration
 - No real AI or LLM execution
 - No automatic remediation
