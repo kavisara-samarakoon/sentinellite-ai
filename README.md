@@ -11,10 +11,10 @@ or perform automatic remediation.
 
 ## Status
 
-The current version is `v1.1.0-beta`, prepared as a release candidate and not yet published
-as a GitHub release. See the [candidate release notes](docs/release-notes-v1.1.0-beta.md).
-The current published release remains
-[v1.0.0-beta](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.0.0-beta).
+The current version is `v1.1.0-beta`, and it is the current published
+[GitHub pre-release](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.1.0-beta).
+See the [release notes](docs/release-notes-v1.1.0-beta.md) for the published assets and hashes.
+The previous published release was `v1.0.0-beta`.
 SentinelLite AI is beta-stage software, not a production EDR, and is not published to PyPI.
 
 The automated suite covers configuration, collectors,
@@ -56,8 +56,8 @@ or from a trusted source checkout.
 ## Install from GitHub Release
 
 For a normal user installation, download both
-`sentinellite_ai-1.0.0b0-py3-none-any.whl` and `SHA256SUMS.txt` from the
-[v1.0.0-beta release page](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.0.0-beta).
+`sentinellite_ai-1.1.0b0-py3-none-any.whl` and `SHA256SUMS.txt` from the
+[v1.1.0-beta release page](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.1.0-beta).
 Verify the downloaded wheel against `SHA256SUMS.txt`, then open a terminal in the download
 directory and install it into an isolated environment:
 
@@ -65,13 +65,12 @@ directory and install it into an isolated environment:
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install ./sentinellite_ai-1.0.0b0-py3-none-any.whl
+python -m pip install ./sentinellite_ai-1.1.0b0-py3-none-any.whl
 sentinellite --version
 ```
 
-The version command should display `SentinelLite AI v1.0.0-beta`.
-This stable wheel does not include `doctor` or `demo`. Use the source installation from
-`feature/v1.1-product-usability` before the `v1.1.0-beta` release, or its wheel after release.
+The version command should display `SentinelLite AI v1.1.0-beta`.
+This wheel includes `doctor` and `demo` for local installation checks and a synthetic demo.
 
 ### macOS
 
@@ -99,7 +98,7 @@ test tools:
 ```bash
 git clone https://github.com/kavisara-samarakoon/sentinellite-ai.git
 cd sentinellite-ai
-git switch feature/v1.1-product-usability
+git switch main
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
@@ -138,8 +137,8 @@ sentinellite reports show <REPORT_PATH>
 ```
 
 Replace `<REPORT_PATH>` with the saved path printed by `demo`. Both commands are included
-in `v1.1.0-beta`: use source before release, or the wheel after release. The published
-`v1.0.0-beta` wheel does not include them.
+in the published `v1.1.0-beta` wheel and current source. The previous `v1.0.0-beta` wheel
+did not include them.
 `demo` uses bundled in-memory records and built-in authentication rules. It reads no real
 logs, performs no process/network/file observation, and sends no network traffic. Its
 alerts are synthetic examples for report review. No root privileges are needed.
@@ -380,10 +379,9 @@ Historical milestone notes remain available for reference:
 - [v0.8.0-alpha](docs/release-notes-v0.8.0-alpha.md)
 - [v0.9.0-alpha](docs/release-notes-v0.9.0-alpha.md)
 
-The published beta notes are available at
+The current published beta notes are available at
+[v1.1.0-beta](docs/release-notes-v1.1.0-beta.md). Previous beta notes remain available at
 [v1.0.0-beta](docs/release-notes-v1.0.0-beta.md).
-The unpublished candidate notes are available at
-[v1.1.0-beta](docs/release-notes-v1.1.0-beta.md).
 
 ## License
 

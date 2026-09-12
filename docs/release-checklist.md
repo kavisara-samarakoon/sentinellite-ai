@@ -4,8 +4,10 @@ Use this checklist for the exact commit proposed for a SentinelLite AI GitHub pr
 The checklist verifies the existing local defensive CLI; it does not authorize new product
 capabilities or publication to PyPI.
 
-For `v1.1.0-beta`, the CLI display version is `1.1.0-beta`, the normalized Python package
-version is `1.1.0b0`, and the release remains unpublished until every mandatory gate passes.
+For the published `v1.1.0-beta` release, the CLI display version is `1.1.0-beta` and the
+normalized Python package version is `1.1.0b0`. Its publication details are recorded in the
+[release notes](release-notes-v1.1.0-beta.md). Reuse the gates below for future releases;
+the unchecked boxes are a checklist template, not the current release status.
 
 ## 1. Scope and Source State
 

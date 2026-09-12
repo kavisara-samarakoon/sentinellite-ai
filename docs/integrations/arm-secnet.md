@@ -11,10 +11,10 @@ separate repositories. Do not merge their repositories or introduce a runtime de
 between them. ARM-SecNet provides the VM environment; SentinelLite AI is installed and
 invoked independently inside the VM.
 
-This guide covers the `v1.1.0-beta` release candidate, which includes `doctor` and `demo`.
-The candidate is not yet published as a GitHub release. Before release, install from
-`feature/v1.1-product-usability`; after release, use the `v1.1.0-beta` wheel. The current
-stable `v1.0.0-beta` wheel does not include these commands.
+`v1.1.0-beta` is published as a
+[GitHub pre-release](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.1.0-beta).
+Its wheel includes `doctor` and `demo`. Install the published wheel or current source
+from `main`. The previous `v1.0.0-beta` wheel did not include these commands.
 
 These instructions describe a lab workflow. They do not establish completed ARM-SecNet
 runtime validation or comprehensive Ubuntu ARM64 compatibility.
@@ -47,12 +47,12 @@ it does not by itself validate SentinelLite's observation capabilities.
 
 ## Install from Source for Development
 
-Before the `v1.1.0-beta` release, install the candidate from this branch:
+For a development installation, use the current source from `main`:
 
 ```bash
 git clone https://github.com/kavisara-samarakoon/sentinellite-ai.git
 cd sentinellite-ai
-git switch feature/v1.1-product-usability
+git switch main
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
@@ -67,12 +67,11 @@ virtual environment active for subsequent commands. The expected version output 
 
 ## Install from a GitHub Release Wheel
 
-SentinelLite AI is not published to PyPI yet. **After the `v1.1.0-beta` GitHub release is
-published**, download its wheel and `SHA256SUMS.txt` from that release's assets. No
-`v1.1.0-beta` release or download availability is claimed here. Until release, use the
-source installation above.
+SentinelLite AI is not published to PyPI yet. Download
+`sentinellite_ai-1.1.0b0-py3-none-any.whl` and `SHA256SUMS.txt` from the published
+[v1.1.0-beta GitHub pre-release](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.1.0-beta).
 
-After release, make the downloaded files available inside the Ubuntu VM and verify the
+Make the downloaded files available inside the Ubuntu VM and verify the
 wheel against `SHA256SUMS.txt`. In the directory containing the verified wheel, create a
 separate environment:
 
@@ -85,13 +84,13 @@ sentinellite --version
 ```
 
 The `v1.1.0-beta` wheel should print `SentinelLite AI v1.1.0-beta` and includes `doctor` and
-`demo`. The already published `v1.0.0-beta` wheel described in the
-[README installation instructions](../../README.md#install-from-github-release) does not
-include them. Keep the environment for your `v1.1.0-beta` installation active below.
+`demo`. The previous `v1.0.0-beta` wheel did not include them. See the
+[README installation instructions](../../README.md#install-from-github-release) for the
+current release. Keep the environment for your `v1.1.0-beta` installation active below.
 
 ## First Safe Commands
 
-With the `v1.1.0-beta` environment active (source before release, or wheel after release), run:
+With the `v1.1.0-beta` environment active, run:
 
 ```bash
 sentinellite doctor
@@ -154,8 +153,8 @@ complete this walkthrough. Empty results are not proof that the endpoint is secu
 
 ## Screenshot and Evidence Checklist
 
-Capture the following from the Ubuntu VM using `v1.1.0-beta` installed from source before
-release, or from its wheel after release:
+Capture the following from the Ubuntu VM using `v1.1.0-beta` installed from its published
+wheel or source:
 
 - [ ] `uname -m` output showing `aarch64`
 - [ ] `python3 --version` output showing Python 3.11 or newer
