@@ -3,8 +3,6 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Any
 
-import psutil
-
 
 @dataclass(frozen=True, slots=True)
 class ProcessInfo:
@@ -31,6 +29,8 @@ def collect_processes() -> list[ProcessInfo]:
     Some process fields may be unavailable without root privileges.
     In those cases, missing values are safely replaced with defaults.
     """
+    import psutil
+
     process_attributes = [
         "pid",
         "name",

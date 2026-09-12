@@ -4,8 +4,6 @@ from importlib.resources import files
 from pathlib import Path
 from typing import Any, overload
 
-import yaml
-
 from sentinellite.config.models import (
     ModulesConfig,
     ReportingConfig,
@@ -179,6 +177,8 @@ def _parse_disabled_rule_ids(value: object) -> tuple[str, ...]:
 
 def _load_packaged_default_config() -> dict[str, Any]:
     """Load the legacy status configuration from the installed package."""
+    import yaml
+
     try:
         config_resource = files("sentinellite.config").joinpath(
             DEFAULT_CONFIG_RESOURCE

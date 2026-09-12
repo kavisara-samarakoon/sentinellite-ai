@@ -3,12 +3,48 @@
 ## Purpose
 
 This is the deterministic golden path for demonstrating the SentinelLite AI
-`v1.0.0-beta` release surface. It uses bundled, non-sensitive authentication fixtures and isolated
+`v1.1.0-beta` release candidate. It uses bundled, non-sensitive authentication fixtures and isolated
 temporary output. It does not require elevated privileges, read real authentication-log
 contents, or rely on environment-dependent alert results.
 
 SentinelLite AI is an on-demand local defensive CLI, not a daemon, background monitor,
 production EDR, external notification service, or AI/LLM system.
+
+## Safe Demo Shortcut for v1.1.0-beta
+
+Before release, install source from `feature/v1.1-product-usability`; after release, the
+`v1.1.0-beta` wheel can also be used. Run these commands from a writable directory:
+
+```bash
+sentinellite doctor
+sentinellite demo
+sentinellite reports list
+sentinellite reports show <REPORT_PATH>
+```
+
+Use the saved report path printed by `demo` in place of `<REPORT_PATH>`. The demo fixture
+is included in the Python package, so the working directory does not need to be a source
+checkout. It processes three synthetic authentication records in memory using the normal
+normalization, detection, scoring and JSON report pipeline. It uses built-in rules even
+when observation modules or rules are disabled in a selected config. The report schema
+is unchanged; examples are for learning report review and do not describe the real host.
+
+`doctor` checks local versions, system, architecture, packaged default configuration,
+dependency imports and report-directory write access. It creates the directory if needed,
+writes a uniquely named temporary file, then removes that file without changing existing
+reports. FAIL means exit code 1; PASS and WARNING mean exit code 0. A non-Linux platform
+produces a warning about the target observation environment, without blocking the demo.
+These are installation checks, not an assessment of endpoint security.
+Typer and Rich must be installed for the CLI, including doctor, to start.
+
+Neither command reads system logs, observes processes, connections or file integrity,
+sends network traffic, or requires root. `--output-dir PATH` overrides the report directory
+for either command; otherwise they use the selected TOML reporting directory or `reports`.
+Demo also honors the TOML setting for stored deterministic explanations. Follow the review
+commands printed by `demo` when using a custom directory.
+
+These commands are included in `v1.1.0-beta`. The published `v1.0.0-beta` wheel does not
+include them. The longer fixture walkthrough below remains available from the source checkout.
 
 ## Prerequisites
 
@@ -53,7 +89,7 @@ sentinellite --help
 Both version commands must print the same version. The help output should describe a local
 defensive observation and report-review CLI, not a resident agent or service.
 
-For the current release candidate, both commands print `SentinelLite AI v1.0.0-beta`.
+For the current release candidate, both commands print `SentinelLite AI v1.1.0-beta`.
 
 ## 3. Show Local Status
 

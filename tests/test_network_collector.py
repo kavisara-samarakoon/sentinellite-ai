@@ -34,10 +34,10 @@ def test_collect_network_connections_normalizes_safe_fields(monkeypatch):
             return "python"
 
     monkeypatch.setattr(
-        "sentinellite.collectors.network.psutil.net_connections",
+        "psutil.net_connections",
         fake_net_connections,
     )
-    monkeypatch.setattr("sentinellite.collectors.network.psutil.Process", FakeProcess)
+    monkeypatch.setattr("psutil.Process", FakeProcess)
 
     connections = collect_network_connections()
 
@@ -59,7 +59,7 @@ def test_collect_network_connections_normalizes_safe_fields(monkeypatch):
 
 def test_collect_network_connections_handles_missing_addresses(monkeypatch):
     monkeypatch.setattr(
-        "sentinellite.collectors.network.psutil.net_connections",
+        "psutil.net_connections",
         lambda *, kind: [fake_connection(laddr=(), raddr=None, pid=None)],
     )
 
@@ -86,14 +86,14 @@ def test_collect_network_connections_handles_unavailable_process_names(
     process_error,
 ):
     monkeypatch.setattr(
-        "sentinellite.collectors.network.psutil.net_connections",
+        "psutil.net_connections",
         lambda *, kind: [fake_connection()],
     )
 
     def unavailable_process(_pid):
         raise process_error
 
-    monkeypatch.setattr("sentinellite.collectors.network.psutil.Process", unavailable_process)
+    monkeypatch.setattr("psutil.Process", unavailable_process)
 
     connections = collect_network_connections()
 
@@ -118,7 +118,7 @@ def test_collect_network_connections_handles_collection_errors(
         raise collection_error
 
     monkeypatch.setattr(
-        "sentinellite.collectors.network.psutil.net_connections",
+        "psutil.net_connections",
         unavailable_connections,
     )
 

@@ -38,7 +38,7 @@ def test_collect_processes_normalizes_process_data(monkeypatch):
         return fake_processes
 
     monkeypatch.setattr(
-        "sentinellite.collectors.process.psutil.process_iter",
+        "psutil.process_iter",
         fake_process_iter,
     )
 
@@ -76,7 +76,7 @@ def test_collect_processes_skips_inaccessible_processes(monkeypatch):
         return fake_processes
 
     monkeypatch.setattr(
-        "sentinellite.collectors.process.psutil.process_iter",
+        "psutil.process_iter",
         fake_process_iter,
     )
 
@@ -93,7 +93,7 @@ def test_collect_processes_uses_defaults_for_missing_values(monkeypatch):
         return fake_processes
 
     monkeypatch.setattr(
-        "sentinellite.collectors.process.psutil.process_iter",
+        "psutil.process_iter",
         fake_process_iter,
     )
 
