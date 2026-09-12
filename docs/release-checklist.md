@@ -4,11 +4,32 @@ Use this checklist for the exact commit proposed for a SentinelLite AI GitHub pr
 The checklist verifies the existing local defensive CLI; it does not authorize new product
 capabilities or publication to PyPI.
 
-For the `v1.2.0-beta` release candidate, the CLI display version is `1.2.0-beta` and the
-normalized Python package version is `1.2.0b0`. See the
-[release candidate notes](release-notes-v1.2.0-beta.md). GitHub release and tag are pending;
-wheel/sdist hashes remain pending final build. The unchecked gates below must be recorded
-against the exact candidate before publication.
+## Completed v1.2.0-beta Release Record
+
+`v1.2.0-beta` is published as a
+[GitHub pre-release](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.2.0-beta)
+at `2026-09-12T05:37:29Z` (draft: `false`, pre-release: `true`). The CLI display version is
+`1.2.0-beta` and normalized Python package version is `1.2.0b0`.
+
+- Git tag: `v1.2.0-beta`
+- Annotated tag object: `548c4ce46de9dbbf52cf43fd9f5cb541224fa03f`
+- Tag target commit: `d60813350cbb2b1e09ed99c6afa15442f280e043`
+- Final validation passed: `pip check`, both version entry points, dashboard export help,
+  Ruff, 652 automated tests, and `git diff --check`.
+- Clean wheel smoke passed: installation and version output, 3 synthetic events and
+  3 alerts from `demo`, and export to `reports/dashboard.html` with the dashboard title
+  and `AUTH-001` / `AUTH-002` / `AUTH-003` rows.
+- Published wheel, sdist, and `SHA256SUMS.txt` hashes are recorded in the
+  [release notes](release-notes-v1.2.0-beta.md#release-assets-and-sha-256-hashes).
+
+ARM-SecNet evidence remains scoped to one Ubuntu 26.04 LTS `aarch64` VM at SentinelLite
+source commit `d1775f0ca09d714f5ed9d681af90f216c1c39e8e`. It does not establish a new VM run
+at the published release commit or universal ARM64 compatibility.
+
+The unchecked sections below are a reusable checklist for future releases, not the
+publication status of `v1.2.0-beta`. Set version expectations to the intended release and
+record each gate against its exact source commit; the record above lists the confirmed
+checks for this release. Publication is already complete; do not recreate its tag or assets.
 
 ## 1. Scope and Source State
 
@@ -54,8 +75,9 @@ sentinellite
 python -m sentinellite
 ```
 
-- [ ] Console and module entry points both display `SentinelLite AI v1.2.0-beta` exactly.
-- [ ] Installed package metadata reports `1.2.0b0`, derived from `sentinellite.__version__`.
+- [ ] Console and module entry points both display the intended release version exactly.
+- [ ] Installed package metadata reports the intended normalized version, derived from
+      `sentinellite.__version__`.
 - [ ] Both entry points expose the same command tree.
 - [ ] Bare status works outside the repository checkout.
 - [ ] Bare status uses an explicitly selected TOML config.
@@ -68,7 +90,7 @@ python -m sentinellite
 python -m build
 ```
 
-- [ ] The final build produces the expected `1.2.0b0` wheel and sdist in a clean output directory.
+- [ ] The final build produces the intended version's wheel and sdist in a clean output directory.
 - [ ] Wheel metadata contains the normalized intended version.
 - [ ] The wheel contains Python package modules and `sentinellite/config/default.yaml`.
 - [ ] The wheel contains the MIT License metadata and license file.
@@ -139,7 +161,7 @@ test -s "$dashboard_root/dashboard.html"
 
 - [ ] Cross-check the separate [Lab 03 evidence record](https://github.com/kavisara-samarakoon/arm-secnet/blob/d3d9a7153939f58ebe9c08215ea4211c65472595/docs/evidence/v1.1-sentinellite-dashboard.md).
 - [ ] Record its scope: one Ubuntu 26.04 LTS `aarch64` VM running SentinelLite source commit
-      `d1775f0ca09d714f5ed9d681af90f216c1c39e8e`, before the candidate version bump.
+      `d1775f0ca09d714f5ed9d681af90f216c1c39e8e`, before the `v1.2.0-beta` version bump.
 - [ ] Confirm doctor: 10 passed, 0 warnings, 0 failed; demo: 3 synthetic events, 3 alerts;
       dashboard: local static HTML generated from local JSON reports.
 - [ ] Confirm ARM-SecNet documentation/evidence validation after merge: 29 passed,

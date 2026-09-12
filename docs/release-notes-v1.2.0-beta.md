@@ -1,19 +1,47 @@
 # SentinelLite AI v1.2.0-beta — Local Dashboard and ARM-SecNet Lab Validation
 
-## Release candidate status
+## Published Release
 
-- GitHub release: pending
-- Tag: pending
-- Wheel/sdist hashes: pending final build
+`v1.2.0-beta` is published as a GitHub pre-release named **SentinelLite AI v1.2.0-beta**.
 
-The prepared source version is `1.2.0-beta`; normalized Python package metadata is
-`1.2.0b0`. This is a release candidate, not a published GitHub release. Final publication
-time, release commit, and asset digests will be recorded after release creation.
+- [GitHub release](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.2.0-beta)
+- Published at: `2026-09-12T05:37:29Z`
+- Draft: `false`; pre-release: `true`
+- Git tag: `v1.2.0-beta`
+- Annotated tag object: `548c4ce46de9dbbf52cf43fd9f5cb541224fa03f`
+- Tag target commit: `d60813350cbb2b1e09ed99c6afa15442f280e043`
+
+The CLI display version is `1.2.0-beta`; normalized Python package metadata is `1.2.0b0`.
 SentinelLite AI is not published to PyPI.
+
+## Release Assets and SHA-256 Hashes
+
+The GitHub release contains these final assets:
+
+| Asset | SHA-256 |
+| --- | --- |
+| `sentinellite_ai-1.2.0b0-py3-none-any.whl` | `fc8c647921d1d2575cb0ac25e1a7f32191e8ea8e0363a90a4728bf59dae4ba15` |
+| `sentinellite_ai-1.2.0b0.tar.gz` | `c3fa1c8e56e179b836f7533d84b5ee2383f75eb15b1f39a6892eb57da7f77ee5` |
+| `SHA256SUMS.txt` | `276b978ba01b5e7b6d8232c778f647cd499e70f3e23d48d15dd9de0e7fd51afd` |
+
+The `SHA256SUMS.txt` row is the digest of the checksum file itself.
+
+## Final Release Validation
+
+Before release, `pip check`, both version entry points, `dashboard export --help`, Ruff,
+all **652 automated tests**, and `git diff --check` passed. Both entry points displayed
+`SentinelLite AI v1.2.0-beta`.
+
+The clean wheel smoke test passed: the wheel installed successfully, the version command
+showed `SentinelLite AI v1.2.0-beta`, and `sentinellite demo` produced 3 synthetic events
+and 3 alerts. `sentinellite dashboard export` saved `reports/dashboard.html`; the HTML
+contained `SentinelLite AI Local Dashboard` and rows for `AUTH-001`, `AUTH-002`, and
+`AUTH-003`. This confirms the synthetic report-to-dashboard workflow, not endpoint
+security effectiveness.
 
 ## Local Static Dashboard
 
-The release candidate includes:
+The published release includes:
 
 ```bash
 sentinellite dashboard export --reports-dir reports --output reports/dashboard.html --limit 25
@@ -48,7 +76,7 @@ traffic. Replace `<REPORT_PATH>` with the saved path printed by `demo`. The dash
 reads the saved local JSON reports; it does not generate new endpoint observations.
 
 The existing JSON report schema is unchanged. See the [demo guide](demo-guide.md) and
-[release checklist](release-checklist.md) for the walkthrough and candidate validation gates.
+[release checklist](release-checklist.md) for the walkthrough and reusable release validation gates.
 
 ## ARM-SecNet Lab 03 Evidence
 
@@ -70,7 +98,7 @@ source displayed `SentinelLite AI v1.1.0-beta` and included the post-release das
 The 29 checks validate ARM-SecNet documentation and evidence files. They are separate from
 SentinelLite's automated test suite and the recorded VM command results. This evidence
 applies to that specific VM and source commit only: it does not prove universal ARM64
-compatibility or validation of the exact release candidate commit.
+compatibility or validation of the exact published release commit.
 
 ARM-SecNet provides the ARM64 lab environment. SentinelLite AI provides the optional local
 defensive observation, report-review, and static dashboard CLI. They remain separate
@@ -96,4 +124,4 @@ local artifacts that require appropriate handling when they contain host-derived
 ## Release History
 
 The previous published milestone is [v1.1.0-beta](release-notes-v1.1.0-beta.md).
-Its historical publication details remain unchanged; they do not describe this candidate.
+Its historical publication details remain unchanged; they do not describe this release.
