@@ -11,9 +11,9 @@ separate repositories. Do not merge their repositories or introduce a runtime de
 between them. ARM-SecNet provides the VM environment; SentinelLite AI is installed and
 invoked independently inside the VM.
 
-`v1.2.0-beta` is the local dashboard milestone, currently prepared as a release candidate.
-It includes `doctor`, `demo`, and `dashboard export`. The GitHub release is pending; use
-source from `feature/v1.2-release-prep` until release. The older `v1.1.0-beta` wheel includes
+`v1.2.0-beta` is the local dashboard milestone, published as a
+[GitHub pre-release](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.2.0-beta).
+Its wheel includes `doctor`, `demo`, and `dashboard export`. The older `v1.1.0-beta` wheel includes
 `doctor` and `demo` but predates the dashboard exporter; the `v1.0.0-beta` wheel includes
 neither shortcut.
 
@@ -35,7 +35,7 @@ The recorded run used SentinelLite source from `main` at
 | ARM-SecNet documentation/evidence validation after merge | 29 passed, 0 warnings, 0 failures |
 
 This records the workflow on that specific VM only. It does not prove universal ARM64
-compatibility, production protection, or validation of the exact `v1.2.0-beta` candidate.
+compatibility, production protection, or validation of the exact `v1.2.0-beta` release commit.
 The 29 checks validate ARM-SecNet documentation and evidence files; they are separate from
 SentinelLite automated tests and the recorded VM command results.
 
@@ -67,12 +67,12 @@ it does not by itself validate SentinelLite's observation capabilities.
 
 ## Install from Source for Development
 
-For this release candidate, select the preparation branch:
+For development, use the current source from `main`:
 
 ```bash
 git clone https://github.com/kavisara-samarakoon/sentinellite-ai.git
 cd sentinellite-ai
-git switch feature/v1.2-release-prep
+git switch main
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
@@ -87,10 +87,9 @@ virtual environment active for subsequent commands. The expected version output 
 
 ## Install from a GitHub Release Wheel
 
-SentinelLite AI is not published to PyPI yet. The `v1.2.0-beta` GitHub release is pending.
-Use the source installation above for the candidate. After release, download the expected
-`sentinellite_ai-1.2.0b0-py3-none-any.whl` and `SHA256SUMS.txt` from its GitHub release page.
-The wheel installation commands below apply after release.
+SentinelLite AI is not published to PyPI yet. Download
+`sentinellite_ai-1.2.0b0-py3-none-any.whl` and `SHA256SUMS.txt` from the
+[published v1.2.0-beta GitHub pre-release](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.2.0-beta).
 
 Make the downloaded files available inside the Ubuntu VM and verify the
 wheel against `SHA256SUMS.txt`. In the directory containing the verified wheel, create a
@@ -106,12 +105,11 @@ sentinellite --version
 
 The expected version output is `SentinelLite AI v1.2.0-beta`. See the
 [README installation instructions](../../README.md#install-from-github-release) for release
-status. Keep the environment for your candidate source installation active below, or use
-the `v1.2.0-beta` wheel after release.
+status. Keep the environment for your source or published wheel installation active below.
 
 ## First Safe Commands
 
-With the `v1.2.0-beta` release candidate environment active, run:
+With the `v1.2.0-beta` environment active, run:
 
 ```bash
 sentinellite doctor
@@ -183,8 +181,8 @@ complete this walkthrough. Empty results are not proof that the endpoint is secu
 ## Screenshot and Evidence Checklist
 
 The linked Lab 03 evidence records the earlier source run. For a new validation of the
-exact `v1.2.0-beta` release candidate, capture the following from the Ubuntu VM using the
-candidate source (or its wheel after release):
+exact `v1.2.0-beta` release, capture the following from the Ubuntu VM using the
+published wheel or source at the release tag:
 
 - [ ] `uname -m` output showing `aarch64`
 - [ ] `python3 --version` output showing Python 3.11 or newer

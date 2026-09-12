@@ -3,7 +3,7 @@
 ## Purpose
 
 This is the deterministic golden path for demonstrating the SentinelLite AI
-`v1.2.0-beta` release candidate surface. It uses bundled, non-sensitive authentication fixtures and isolated
+`v1.2.0-beta` release surface. It uses bundled, non-sensitive authentication fixtures and isolated
 temporary output. It does not require elevated privileges, read real authentication-log
 contents, or rely on environment-dependent alert results.
 
@@ -12,9 +12,9 @@ production EDR, external notification service, or AI/LLM system.
 
 ## Safe Demo Shortcut for v1.2.0-beta
 
-Install the `v1.2.0-beta` release candidate from `feature/v1.2-release-prep` using the
-[README source instructions](../README.md#development-install-from-source).
-The GitHub release is pending; use its wheel only after release.
+Install the published `v1.2.0-beta` wheel using the
+[README installation instructions](../README.md#install-from-github-release), or use the
+[source installation](../README.md#development-install-from-source) for development.
 Run these commands from a writable directory:
 
 ```bash
@@ -46,7 +46,7 @@ for either command; otherwise they use the selected TOML reporting directory or 
 Demo also honors the TOML setting for stored deterministic explanations. Follow the review
 commands printed by `demo` when using a custom directory.
 
-`dashboard export` is included in the `v1.2.0-beta` release candidate. It reads existing
+`dashboard export` is included in the published `v1.2.0-beta` release. It reads existing
 local JSON reports only, leaving those reports unchanged, and writes standalone static HTML
 at `reports/dashboard.html` by default. It performs no observation or scanning and uses no
 server, browser auto-open, external scripts/assets, network requests, live monitoring, or
@@ -98,7 +98,7 @@ sentinellite --help
 Both version commands must print the same version. The help output should describe a local
 defensive observation and report-review CLI, not a resident agent or service.
 
-For this release candidate, both commands print `SentinelLite AI v1.2.0-beta`.
+For this release, both commands print `SentinelLite AI v1.2.0-beta`.
 
 ## 3. Show Local Status
 

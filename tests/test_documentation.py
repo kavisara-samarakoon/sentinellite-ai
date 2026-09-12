@@ -37,25 +37,33 @@ def test_readme_exposes_current_install_and_release_documents() -> None:
     assert "docs/data-contracts.md" in readme
     assert "docs/release-checklist.md" in readme
     assert "production EDR" in readme
-    assert "The current source version is `v1.2.0-beta`" in readme
+    assert "The current version is `v1.2.0-beta`" in readme
     assert "docs/release-notes-v1.2.0-beta.md" in readme
-    assert "release candidate" in readme
-    assert "The `v1.2.0-beta` GitHub release is pending" in readme
+    assert "current published\n[GitHub pre-release]" in readme
+    assert "releases/tag/v1.2.0-beta" in readme
+    assert "release candidate" not in readme.lower()
+    assert "pending" not in readme.lower()
     assert "releases/tag/v1.1.0-beta" in readme
-    assert "previous published release was `v1.0.0-beta`" in readme
+    assert "previous published release was\n[v1.1.0-beta]" in readme
     assert "current published milestone is `v0.9.0-alpha`" not in readme.lower()
 
 
-def test_beta_release_notes_are_candidate_and_safety_scoped() -> None:
+def test_beta_release_notes_are_published_and_safety_scoped() -> None:
     release_notes = (
         PROJECT_ROOT / "docs/release-notes-v1.2.0-beta.md"
     ).read_text(encoding="utf-8")
     normalized_notes = " ".join(release_notes.lower().split())
 
-    assert "## Release candidate status" in release_notes
-    assert "GitHub release: pending" in release_notes
-    assert "Tag: pending" in release_notes
-    assert "Wheel/sdist hashes: pending final build" in release_notes
+    assert "`v1.2.0-beta` is published as a github pre-release" in normalized_notes
+    assert "releases/tag/v1.2.0-beta" in release_notes
+    assert "2026-09-12T05:37:29Z" in release_notes
+    assert "548c4ce46de9dbbf52cf43fd9f5cb541224fa03f" in release_notes
+    assert "d60813350cbb2b1e09ed99c6afa15442f280e043" in release_notes
+    assert "fc8c647921d1d2575cb0ac25e1a7f32191e8ea8e0363a90a4728bf59dae4ba15" in release_notes
+    assert "c3fa1c8e56e179b836f7533d84b5ee2383f75eb15b1f39a6892eb57da7f77ee5" in release_notes
+    assert "276b978ba01b5e7b6d8232c778f647cd499e70f3e23d48d15dd9de0e7fd51afd" in release_notes
+    assert "pending" not in normalized_notes
+    assert "release candidate" not in normalized_notes
     assert "sentinellite dashboard export" in release_notes
     assert "d1775f0ca09d714f5ed9d681af90f216c1c39e8e" in release_notes
     assert "does not prove universal arm64" in normalized_notes
