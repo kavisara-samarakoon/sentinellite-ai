@@ -11,13 +11,33 @@ separate repositories. Do not merge their repositories or introduce a runtime de
 between them. ARM-SecNet provides the VM environment; SentinelLite AI is installed and
 invoked independently inside the VM.
 
-`v1.1.0-beta` is published as a
-[GitHub pre-release](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.1.0-beta).
-Its wheel includes `doctor` and `demo`. Install the published wheel or current source
-from `main`. The previous `v1.0.0-beta` wheel did not include these commands.
+`v1.2.0-beta` is the local dashboard milestone, currently prepared as a release candidate.
+It includes `doctor`, `demo`, and `dashboard export`. The GitHub release is pending; use
+source from `feature/v1.2-release-prep` until release. The older `v1.1.0-beta` wheel includes
+`doctor` and `demo` but predates the dashboard exporter; the `v1.0.0-beta` wheel includes
+neither shortcut.
 
-These instructions describe a lab workflow. They do not establish completed ARM-SecNet
-runtime validation or comprehensive Ubuntu ARM64 compatibility.
+## Recorded ARM-SecNet Lab 03 Evidence
+
+[Lab 03 runtime evidence](https://github.com/kavisara-samarakoon/arm-secnet/blob/d3d9a7153939f58ebe9c08215ea4211c65472595/docs/evidence/v1.1-sentinellite-dashboard.md)
+is completed in the separate ARM-SecNet repository for one Ubuntu 26.04 LTS `aarch64` VM.
+The recorded run used SentinelLite source from `main` at
+`d1775f0ca09d714f5ed9d681af90f216c1c39e8e`, before this release version bump.
+
+| Recorded check | Result |
+| --- | --- |
+| Python in the VM | 3.14.4 |
+| SentinelLite version at the tested commit | `SentinelLite AI v1.1.0-beta` |
+| `doctor` | 10 passed, 0 warnings, 0 failed |
+| Synthetic `demo` | 3 synthetic events, 3 alerts |
+| JSON report review | `AUTH-001`, `AUTH-002`, `AUTH-003`; low 1, medium 2 |
+| Static dashboard export and browser review | `reports/dashboard.html`; 1 report, 3 alerts, highest severity medium |
+| ARM-SecNet documentation/evidence validation after merge | 29 passed, 0 warnings, 0 failures |
+
+This records the workflow on that specific VM only. It does not prove universal ARM64
+compatibility, production protection, or validation of the exact `v1.2.0-beta` candidate.
+The 29 checks validate ARM-SecNet documentation and evidence files; they are separate from
+SentinelLite automated tests and the recorded VM command results.
 
 ## Required Environment
 
@@ -47,12 +67,12 @@ it does not by itself validate SentinelLite's observation capabilities.
 
 ## Install from Source for Development
 
-For a development installation, use the current source from `main`:
+For this release candidate, select the preparation branch:
 
 ```bash
 git clone https://github.com/kavisara-samarakoon/sentinellite-ai.git
 cd sentinellite-ai
-git switch main
+git switch feature/v1.2-release-prep
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
@@ -63,13 +83,14 @@ sentinellite --version
 Keep this checkout separate from ARM-SecNet. The editable installation uses this
 SentinelLite checkout; it does not install or import ARM-SecNet as a dependency. Keep the
 virtual environment active for subsequent commands. The expected version output is
-`SentinelLite AI v1.1.0-beta`.
+`SentinelLite AI v1.2.0-beta`.
 
 ## Install from a GitHub Release Wheel
 
-SentinelLite AI is not published to PyPI yet. Download
-`sentinellite_ai-1.1.0b0-py3-none-any.whl` and `SHA256SUMS.txt` from the published
-[v1.1.0-beta GitHub pre-release](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.1.0-beta).
+SentinelLite AI is not published to PyPI yet. The `v1.2.0-beta` GitHub release is pending.
+Use the source installation above for the candidate. After release, download the expected
+`sentinellite_ai-1.2.0b0-py3-none-any.whl` and `SHA256SUMS.txt` from its GitHub release page.
+The wheel installation commands below apply after release.
 
 Make the downloaded files available inside the Ubuntu VM and verify the
 wheel against `SHA256SUMS.txt`. In the directory containing the verified wheel, create a
@@ -79,22 +100,23 @@ separate environment:
 python3 -m venv .venv-release
 source .venv-release/bin/activate
 python -m pip install --upgrade pip
-python -m pip install ./sentinellite_ai-1.1.0b0-py3-none-any.whl
+python -m pip install ./sentinellite_ai-1.2.0b0-py3-none-any.whl
 sentinellite --version
 ```
 
-The `v1.1.0-beta` wheel should print `SentinelLite AI v1.1.0-beta` and includes `doctor` and
-`demo`. The previous `v1.0.0-beta` wheel did not include them. See the
-[README installation instructions](../../README.md#install-from-github-release) for the
-current release. Keep the environment for your `v1.1.0-beta` installation active below.
+The expected version output is `SentinelLite AI v1.2.0-beta`. See the
+[README installation instructions](../../README.md#install-from-github-release) for release
+status. Keep the environment for your candidate source installation active below, or use
+the `v1.2.0-beta` wheel after release.
 
 ## First Safe Commands
 
-With the `v1.1.0-beta` environment active, run:
+With the `v1.2.0-beta` release candidate environment active, run:
 
 ```bash
 sentinellite doctor
 sentinellite demo
+sentinellite dashboard export
 ```
 
 `doctor` checks local installation readiness only: SentinelLite and Python versions,
@@ -110,6 +132,13 @@ authentication processing and report pipeline to synthetic events, saves a norma
 report with the existing schema, and prints its path and suggested review commands.
 Synthetic alerts are examples for learning the report-review workflow, not findings
 about the VM.
+
+`dashboard export` reads existing local JSON reports only and generates standalone static
+HTML at `reports/dashboard.html`. It leaves reports unchanged and prints the saved path.
+Open that file manually inside the VM for offline review. There is no server, browser
+auto-open, external script or asset, network request, live monitoring, new observation,
+scanning, or automatic remediation. The synthetic demo supplies the reports for this lab.
+If demo used a custom output directory, pass it with `dashboard export --reports-dir PATH`.
 
 ## Review the Report
 
@@ -153,15 +182,18 @@ complete this walkthrough. Empty results are not proof that the endpoint is secu
 
 ## Screenshot and Evidence Checklist
 
-Capture the following from the Ubuntu VM using `v1.1.0-beta` installed from its published
-wheel or source:
+The linked Lab 03 evidence records the earlier source run. For a new validation of the
+exact `v1.2.0-beta` release candidate, capture the following from the Ubuntu VM using the
+candidate source (or its wheel after release):
 
 - [ ] `uname -m` output showing `aarch64`
 - [ ] `python3 --version` output showing Python 3.11 or newer
-- [ ] `sentinellite --version` output
+- [ ] `sentinellite --version`, branch, and full commit output
 - [ ] `sentinellite doctor` output, including the summary and any failures or warnings
 - [ ] `sentinellite demo` output, including the saved report path
 - [ ] `sentinellite reports list` and `sentinellite reports show <REPORT_PATH>` output
+- [ ] `sentinellite dashboard export --help` and export output with the saved HTML path
+- [ ] Local browser dashboard summary, breakdowns, and alert/report tables
 
 Record the Ubuntu release and SentinelLite branch/commit alongside the evidence so the
 results can be tied to a specific lab run. Label demo reports as synthetic. Review and
@@ -185,7 +217,7 @@ See the [security policy](../../SECURITY.md) for the project's full boundaries.
 
 ## Possible Future Work
 
-Future work may include deeper ARM-SecNet validation notes, a later evaluation of TestPyPI
+Future work may include additional ARM-SecNet environment validation notes, a later evaluation of TestPyPI
 distribution, and optional AI architecture planning. These are possible future directions,
 not capabilities delivered by this integration. This guide adds no TestPyPI or PyPI
 publishing and no real AI/LLM integration.
