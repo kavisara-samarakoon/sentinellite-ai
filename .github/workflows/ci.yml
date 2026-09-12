@@ -55,6 +55,9 @@ jobs:
           from pathlib import Path
           from zipfile import ZipFile
 
+          from packaging.version import Version
+          from sentinellite import __version__
+
           wheels = sorted(Path("dist").glob("*.whl"))
           assert len(wheels) == 1, wheels
           wheel = wheels[0]
@@ -79,7 +82,7 @@ jobs:
               metadata = wheel_file.read(metadata_names[0]).decode("utf-8")
               entry_points = wheel_file.read(entry_point_names[0]).decode("utf-8")
               assert "Name: sentinellite-ai" in metadata
-              assert "Version: 1.0.0b0" in metadata
+              assert f"Version: {Version(__version__)}\n" in metadata
               assert "License-Expression: MIT" in metadata
               assert "sentinellite = sentinellite.main:cli" in entry_points
               assert any(
@@ -92,6 +95,7 @@ jobs:
 
       - name: Validate wheel in an isolated environment
         run: |
+          expected_version="$(python -c 'from sentinellite import __version__; print(f"SentinelLite AI v{__version__}")')"
           wheel_path="$(python - <<'PY'
           from pathlib import Path
 
@@ -106,14 +110,15 @@ jobs:
           "$wheel_environment/bin/python" -m pip install "$wheel_path"
 
           cd /tmp
-          test "$("$wheel_environment/bin/sentinellite" --version)" = "SentinelLite AI v1.0.0-beta"
-          test "$("$wheel_environment/bin/python" -m sentinellite --version)" = "SentinelLite AI v1.0.0-beta"
+          test "$("$wheel_environment/bin/sentinellite" --version)" = "$expected_version"
+          test "$("$wheel_environment/bin/python" -m sentinellite --version)" = "$expected_version"
           "$wheel_environment/bin/sentinellite"
 
       - name: Validate installed entry points
         run: |
-          test "$(sentinellite --version)" = "SentinelLite AI v1.0.0-beta"
-          test "$(python -m sentinellite --version)" = "SentinelLite AI v1.0.0-beta"
+          expected_version="$(python -c 'from sentinellite import __version__; print(f"SentinelLite AI v{__version__}")')"
+          test "$(sentinellite --version)" = "$expected_version"
+          test "$(python -m sentinellite --version)" = "$expected_version"
 
           cd /tmp
           sentinellite

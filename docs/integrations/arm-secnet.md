@@ -11,10 +11,10 @@ separate repositories. Do not merge their repositories or introduce a runtime de
 between them. ARM-SecNet provides the VM environment; SentinelLite AI is installed and
 invoked independently inside the VM.
 
-This guide supports the `v1.1.0-beta` usability sprint. The current stable release is
-`v1.0.0-beta`. The new `doctor` and `demo` commands are available on the development branch
-`feature/v1.1-product-usability`; they are not included in the stable `v1.0.0-beta` wheel.
-The development package still reports `v1.0.0-beta` until a separate version update.
+This guide covers the `v1.1.0-beta` release candidate, which includes `doctor` and `demo`.
+The candidate is not yet published as a GitHub release. Before release, install from
+`feature/v1.1-product-usability`; after release, use the `v1.1.0-beta` wheel. The current
+stable `v1.0.0-beta` wheel does not include these commands.
 
 These instructions describe a lab workflow. They do not establish completed ARM-SecNet
 runtime validation or comprehensive Ubuntu ARM64 compatibility.
@@ -47,7 +47,7 @@ it does not by itself validate SentinelLite's observation capabilities.
 
 ## Install from Source for Development
 
-Use this route for the `doctor` and `demo` workflow during the current sprint:
+Before the `v1.1.0-beta` release, install the candidate from this branch:
 
 ```bash
 git clone https://github.com/kavisara-samarakoon/sentinellite-ai.git
@@ -62,36 +62,36 @@ sentinellite --version
 
 Keep this checkout separate from ARM-SecNet. The editable installation uses this
 SentinelLite checkout; it does not install or import ARM-SecNet as a dependency. Keep the
-virtual environment active for subsequent commands. The version output currently remains
-`SentinelLite AI v1.0.0-beta` on this development branch.
+virtual environment active for subsequent commands. The expected version output is
+`SentinelLite AI v1.1.0-beta`.
 
 ## Install from a GitHub Release Wheel
 
-SentinelLite AI is not published to PyPI yet. For a stable installation, download the
-wheel and `SHA256SUMS.txt` from the
-[v1.0.0-beta GitHub release page](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.0.0-beta),
-as described in the [README installation instructions](../../README.md#install-from-github-release).
-Make the downloaded files available inside the Ubuntu VM and verify the wheel against
-`SHA256SUMS.txt` before installation.
+SentinelLite AI is not published to PyPI yet. **After the `v1.1.0-beta` GitHub release is
+published**, download its wheel and `SHA256SUMS.txt` from that release's assets. No
+`v1.1.0-beta` release or download availability is claimed here. Until release, use the
+source installation above.
 
-In the directory containing the verified wheel, create a separate environment:
+After release, make the downloaded files available inside the Ubuntu VM and verify the
+wheel against `SHA256SUMS.txt`. In the directory containing the verified wheel, create a
+separate environment:
 
 ```bash
 python3 -m venv .venv-release
 source .venv-release/bin/activate
 python -m pip install --upgrade pip
-python -m pip install ./sentinellite_ai-1.0.0b0-py3-none-any.whl
+python -m pip install ./sentinellite_ai-1.1.0b0-py3-none-any.whl
 sentinellite --version
 ```
 
-This installs the stable release and should print `SentinelLite AI v1.0.0-beta`.
-That wheel does not include `doctor` or `demo`. Use the development source installation
-above and activate its `.venv` for the next section. A wheel containing those commands
-would require a future release; this guide does not publish one.
+The `v1.1.0-beta` wheel should print `SentinelLite AI v1.1.0-beta` and includes `doctor` and
+`demo`. The already published `v1.0.0-beta` wheel described in the
+[README installation instructions](../../README.md#install-from-github-release) does not
+include them. Keep the environment for your `v1.1.0-beta` installation active below.
 
 ## First Safe Commands
 
-With the development source environment active, run:
+With the `v1.1.0-beta` environment active (source before release, or wheel after release), run:
 
 ```bash
 sentinellite doctor
@@ -154,8 +154,8 @@ complete this walkthrough. Empty results are not proof that the endpoint is secu
 
 ## Screenshot and Evidence Checklist
 
-Capture the following from the Ubuntu VM, using the development source installation for
-`doctor` and `demo`:
+Capture the following from the Ubuntu VM using `v1.1.0-beta` installed from source before
+release, or from its wheel after release:
 
 - [ ] `uname -m` output showing `aarch64`
 - [ ] `python3 --version` output showing Python 3.11 or newer

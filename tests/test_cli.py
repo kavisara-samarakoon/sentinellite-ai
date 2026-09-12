@@ -6,6 +6,7 @@ import pytest
 from typer.main import get_command
 from typer.testing import CliRunner
 
+from sentinellite import __version__
 from sentinellite.collectors.auth_sources import (
     DEFAULT_AUTH_LOG_CANDIDATES,
     AuthLogSourceEntry,
@@ -1091,7 +1092,7 @@ def test_default_status_describes_on_demand_capabilities() -> None:
     result = runner.invoke(app)
 
     assert result.exit_code == 0
-    assert "SentinelLite AI v1.0.0-beta" in result.stdout
+    assert f"SentinelLite AI v{__version__}" in result.stdout
     assert "Local Defensive Observation CLI" in result.stdout
     assert "SentinelLite AI status" in result.stdout
     assert "Status: AVAILABLE" in result.stdout
@@ -1154,7 +1155,7 @@ def test_version_option_exits_before_config_or_system_collection(
     result = runner.invoke(app, ["--version"])
 
     assert result.exit_code == 0
-    assert result.stdout == "SentinelLite AI v1.0.0-beta\n"
+    assert result.stdout == f"SentinelLite AI v{__version__}\n"
     assert result.stderr == ""
 
 

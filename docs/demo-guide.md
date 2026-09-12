@@ -3,16 +3,17 @@
 ## Purpose
 
 This is the deterministic golden path for demonstrating the SentinelLite AI
-`v1.0.0-beta` release surface. It uses bundled, non-sensitive authentication fixtures and isolated
+`v1.1.0-beta` release candidate. It uses bundled, non-sensitive authentication fixtures and isolated
 temporary output. It does not require elevated privileges, read real authentication-log
 contents, or rely on environment-dependent alert results.
 
 SentinelLite AI is an on-demand local defensive CLI, not a daemon, background monitor,
 production EDR, external notification service, or AI/LLM system.
 
-## Development Source Shortcut for v1.1.0-beta
+## Safe Demo Shortcut for v1.1.0-beta
 
-After installing the development source, run these commands from a writable directory:
+Before release, install source from `feature/v1.1-product-usability`; after release, the
+`v1.1.0-beta` wheel can also be used. Run these commands from a writable directory:
 
 ```bash
 sentinellite doctor
@@ -42,8 +43,8 @@ for either command; otherwise they use the selected TOML reporting directory or 
 Demo also honors the TOML setting for stored deterministic explanations. Follow the review
 commands printed by `demo` when using a custom directory.
 
-These commands are development additions; the published `v1.0.0-beta` artifacts and package
-version are unchanged. The longer fixture walkthrough below remains available.
+These commands are included in `v1.1.0-beta`. The published `v1.0.0-beta` wheel does not
+include them. The longer fixture walkthrough below remains available from the source checkout.
 
 ## Prerequisites
 
@@ -88,7 +89,7 @@ sentinellite --help
 Both version commands must print the same version. The help output should describe a local
 defensive observation and report-review CLI, not a resident agent or service.
 
-For the current release candidate, both commands print `SentinelLite AI v1.0.0-beta`.
+For the current release candidate, both commands print `SentinelLite AI v1.1.0-beta`.
 
 ## 3. Show Local Status
 

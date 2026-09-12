@@ -10,7 +10,7 @@ CURRENT_DOCUMENTS = (
     PROJECT_ROOT / "docs/linux-validation.md",
     PROJECT_ROOT / "docs/data-contracts.md",
     PROJECT_ROOT / "docs/release-checklist.md",
-    PROJECT_ROOT / "docs/release-notes-v1.0.0-beta.md",
+    PROJECT_ROOT / "docs/release-notes-v1.1.0-beta.md",
 )
 MARKDOWN_LINK_PATTERN = re.compile(r"\[[^]]+\]\(([^)]+)\)")
 
@@ -35,19 +35,19 @@ def test_readme_exposes_current_install_and_release_documents() -> None:
     assert "docs/data-contracts.md" in readme
     assert "docs/release-checklist.md" in readme
     assert "production EDR" in readme
-    assert "The current version is `v1.0.0-beta`" in readme
-    assert "not yet published as a\nGitHub release" in readme
-    assert "previous published milestone is `v0.9.0-alpha`" in readme
+    assert "The current version is `v1.1.0-beta`" in readme
+    assert "not yet published\nas a GitHub release" in readme
+    assert "current published release remains\n[v1.0.0-beta]" in readme
     assert "current published milestone is `v0.9.0-alpha`" not in readme.lower()
 
 
 def test_beta_release_notes_remain_in_development_and_safety_scoped() -> None:
     release_notes = (
-        PROJECT_ROOT / "docs/release-notes-v1.0.0-beta.md"
+        PROJECT_ROOT / "docs/release-notes-v1.1.0-beta.md"
     ).read_text(encoding="utf-8")
     normalized_notes = " ".join(release_notes.lower().split())
 
-    assert "`v1.0.0-beta` is in development" in normalized_notes
+    assert "`v1.1.0-beta` is a release candidate" in normalized_notes
     assert "not yet published as a github release" in normalized_notes
     assert "not a production edr release" in normalized_notes
     assert "no real ai or llm execution" in normalized_notes

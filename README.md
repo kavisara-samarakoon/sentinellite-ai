@@ -11,13 +11,11 @@ or perform automatic remediation.
 
 ## Status
 
-The current version is `v1.0.0-beta`, and it is the current release. It is published as a
-[GitHub pre-release](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.0.0-beta).
-It is beta-stage software and is not a production EDR. The package is not published to
-PyPI. The previous published milestone is `v0.9.0-alpha`.
-
-This replaces the earlier status that `v1.0.0-beta` was not yet published as a
-GitHub release; that statement is no longer current.
+The current version is `v1.1.0-beta`, prepared as a release candidate and not yet published
+as a GitHub release. See the [candidate release notes](docs/release-notes-v1.1.0-beta.md).
+The current published release remains
+[v1.0.0-beta](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.0.0-beta).
+SentinelLite AI is beta-stage software, not a production EDR, and is not published to PyPI.
 
 The automated suite covers configuration, collectors,
 normalization, detection, scoring, reporting, deterministic explanations, local report
@@ -72,6 +70,8 @@ sentinellite --version
 ```
 
 The version command should display `SentinelLite AI v1.0.0-beta`.
+This stable wheel does not include `doctor` or `demo`. Use the source installation from
+`feature/v1.1-product-usability` before the `v1.1.0-beta` release, or its wheel after release.
 
 ### macOS
 
@@ -99,6 +99,7 @@ test tools:
 ```bash
 git clone https://github.com/kavisara-samarakoon/sentinellite-ai.git
 cd sentinellite-ai
+git switch feature/v1.1-product-usability
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
@@ -126,7 +127,7 @@ No `PYTHONPATH` setting is required after installation.
 
 ## Quick Start
 
-When using the development source for `v1.1.0-beta`, check the local installation and
+With `v1.1.0-beta` installed, check the local installation and
 generate a synthetic report from any writable working directory:
 
 ```bash
@@ -136,8 +137,9 @@ sentinellite reports list
 sentinellite reports show <REPORT_PATH>
 ```
 
-Replace `<REPORT_PATH>` with the saved path printed by `demo`. These two new commands are
-available in the development source; the published `v1.0.0-beta` artifacts are unchanged.
+Replace `<REPORT_PATH>` with the saved path printed by `demo`. Both commands are included
+in `v1.1.0-beta`: use source before release, or the wheel after release. The published
+`v1.0.0-beta` wheel does not include them.
 `demo` uses bundled in-memory records and built-in authentication rules. It reads no real
 logs, performs no process/network/file observation, and sends no network traffic. Its
 alerts are synthetic examples for report review. No root privileges are needed.
@@ -181,7 +183,7 @@ See the [demo guide](docs/demo-guide.md) for the complete fixture-to-report work
 For an authorized Ubuntu ARM64 VM on Apple Silicon / UTM, see the
 [ARM-SecNet integration guide](docs/integrations/arm-secnet.md). It covers installing
 SentinelLite AI as an optional local CLI, starting with `sentinellite doctor` and
-`sentinellite demo` from the development source, and reviewing the resulting report.
+`sentinellite demo` in `v1.1.0-beta`, and reviewing the resulting report.
 The projects remain separate repositories with no runtime dependency between them.
 
 ## Explicit TOML Configuration
@@ -237,6 +239,8 @@ The current command surface is:
 ```text
 sentinellite
 sentinellite config-init [--path PATH]
+sentinellite doctor [--output-dir PATH]
+sentinellite demo [--output-dir PATH]
 sentinellite auth-sources list
 sentinellite scan-auth LOG_PATH
 sentinellite scan-process
@@ -359,7 +363,7 @@ Ubuntu ARM64 results and their limitations are recorded in the
 - No external notification delivery or provider configuration
 - No real AI or LLM execution
 - No automatic remediation
-- No ARM-SecNet integration in the v1 beta scope
+- ARM-SecNet integration is documentation-based only, with no runtime dependency
 - No PyPI publication
 
 ## Release History
@@ -378,6 +382,8 @@ Historical milestone notes remain available for reference:
 
 The published beta notes are available at
 [v1.0.0-beta](docs/release-notes-v1.0.0-beta.md).
+The unpublished candidate notes are available at
+[v1.1.0-beta](docs/release-notes-v1.1.0-beta.md).
 
 ## License
 
