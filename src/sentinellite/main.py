@@ -33,6 +33,7 @@ from sentinellite.pipeline.file_integrity_baseline_scan import (
 from sentinellite.pipeline.file_integrity_scan import run_file_integrity_scan
 from sentinellite.pipeline.network_scan import run_network_scan
 from sentinellite.pipeline.process_scan import run_process_scan
+from sentinellite.reporting.dashboard import DashboardExportError, export_dashboard
 from sentinellite.reporting.json_reporter import read_alert_report
 from sentinellite.reporting.notification import (
     NotificationOutputError,
@@ -61,8 +62,13 @@ auth_sources_app = typer.Typer(
     help="Inspect common Linux authentication log source candidates.",
     no_args_is_help=True,
 )
+dashboard_app = typer.Typer(
+    help="Export a static local HTML view of existing JSON reports.",
+    no_args_is_help=True,
+)
 app.add_typer(reports_app, name="reports")
 app.add_typer(auth_sources_app, name="auth-sources")
+app.add_typer(dashboard_app, name="dashboard")
 
 
 def _literal_text(
@@ -456,6 +462,30 @@ def auth_sources_list_command() -> None:
                 style="yellow",
             )
         )
+
+
+@dashboard_app.command("export")
+def dashboard_export_command(
+    reports_dir: Annotated[
+        Path,
+        typer.Option("--reports-dir", help="Directory containing existing local JSON reports."),
+    ] = Path("reports"),
+    output: Annotated[
+        Path,
+        typer.Option("--output", help="Path for the standalone HTML dashboard."),
+    ] = Path("reports/dashboard.html"),
+    limit: Annotated[
+        int,
+        typer.Option("--limit", min=1, help="Maximum reports and total alerts to display."),
+    ] = 25,
+) -> None:
+    """Export stored report summaries without observation, a server or network activity."""
+    try:
+        written_path = export_dashboard(reports_dir, output, limit)
+    except (DashboardExportError, OSError) as error:
+        console.print(_literal_text(f"[!] Dashboard export failed: {error}", style="red"))
+        raise typer.Exit(code=1) from error
+    console.print(_literal_text(f"[+] Saved dashboard: {written_path}", style="green"), soft_wrap=True)
 
 
 @reports_app.command("list")
