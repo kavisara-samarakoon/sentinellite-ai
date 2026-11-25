@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "report_id": "sentinellite-report-2026-01-01T00:00:00+00:00",
+  "report_type": "sentinellite_alert_report",
+  "generated_at": "2026-01-01T00:00:00+00:00",
+  "alert_count": 0,
+  "alerts": []
+}

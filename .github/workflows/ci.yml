@@ -46,6 +46,36 @@ jobs:
       - name: Run Pytest
         run: PYTHONDONTWRITEBYTECODE=1 pytest -p no:cacheprovider
 
+      - name: Validate schema-v1 and historical report compatibility
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          from sentinellite.reporting.schema import ReportContract
+          from sentinellite.reporting.validation import UnsupportedSchemaError, parse_report_json
+
+          fixtures = Path("tests/fixtures/report_schema")
+          for suffix in ("alert", "explanation"):
+              for prefix, contract in (
+                  ("schema_v1", ReportContract.SCHEMA_V1),
+                  ("legacy_unversioned", ReportContract.LEGACY_UNVERSIONED),
+              ):
+                  path = fixtures / f"{prefix}_{suffix}.json"
+                  original = path.read_bytes()
+                  validated = parse_report_json(original)
+                  assert validated.contract is contract
+                  assert ("schema_version" in validated.to_dict()) == (contract is ReportContract.SCHEMA_V1)
+                  assert validated.schema_version == (1 if contract is ReportContract.SCHEMA_V1 else None)
+                  assert path.read_bytes() == original
+
+          try:
+              parse_report_json((fixtures / "unsupported_schema_version.json").read_bytes())
+          except UnsupportedSchemaError as error:
+              assert error.schema_version == 2
+          else:
+              raise AssertionError("Future report schema must be rejected.")
+          PY
+
       - name: Build wheel
         run: python -m build --wheel
 
@@ -148,11 +178,13 @@ jobs:
           python -m sentinellite scan-auth examples/auth_logs/sample_rhel_secure.log --output-dir "$rhel_report_dir"
 
           python - "$ubuntu_report_dir" "$rhel_report_dir" <<'PY'
-          import json
           import sys
           from pathlib import Path
 
+          from sentinellite.reporting.validation import parse_report_json
+
           expected_keys = {
+              "schema_version",
               "report_id",
               "report_type",
               "generated_at",
@@ -162,8 +194,10 @@ jobs:
           for report_dir_value in sys.argv[1:]:
               report_paths = sorted(Path(report_dir_value).glob("*.json"))
               assert len(report_paths) == 1, report_paths
-              report = json.loads(report_paths[0].read_text(encoding="utf-8"))
+              report = parse_report_json(report_paths[0].read_bytes()).to_dict()
               assert set(report) == expected_keys
+              assert type(report["schema_version"]) is int
+              assert report["schema_version"] == 1
               assert report["report_type"] == "sentinellite_alert_report"
               assert report["alert_count"] == 3
               assert len(report["alerts"]) == 3
@@ -218,6 +252,8 @@ jobs:
           import sys
           from pathlib import Path
 
+          from sentinellite.reporting.validation import parse_report_json
+
           report_path = Path(sys.argv[1])
           notification_path = Path(sys.argv[2])
           snapshot_path = Path(sys.argv[3])
@@ -227,16 +263,19 @@ jobs:
           source_bytes = report_path.read_bytes()
           assert source_bytes == snapshot_path.read_bytes()
 
-          report = json.loads(source_bytes)
+          report = parse_report_json(source_bytes).to_dict()
           notification_text = notification_path.read_text(encoding="utf-8")
           notification = json.loads(notification_text)
           assert set(report) == {
+              "schema_version",
               "report_id",
               "report_type",
               "generated_at",
               "alert_count",
               "alerts",
           }
+          assert type(report["schema_version"]) is int
+          assert report["schema_version"] == 1
           assert "explanations" not in report
           assert set(notification) == {
               "schema_version",
@@ -249,6 +288,7 @@ jobs:
               "risk_level_counts",
               "alerts",
           }
+          assert type(notification["schema_version"]) is int
           assert notification["schema_version"] == 1
           assert notification["output_type"] == "sentinellite_notification_summary"
           assert notification["source"] == {
@@ -318,20 +358,24 @@ jobs:
           smoke_dir=/tmp/sentinellite-json-explanation-smoke
           python -m sentinellite scan-auth examples/auth_logs/sample_auth.log --output-dir "$smoke_dir" --include-explanations
           python - "$smoke_dir" <<'PY'
-          import json
           import sys
           from pathlib import Path
 
+          from sentinellite.reporting.validation import parse_report_json
+
           report_paths = list(Path(sys.argv[1]).glob("*.json"))
           assert len(report_paths) == 1
-          report = json.loads(report_paths[0].read_text(encoding="utf-8"))
+          report = parse_report_json(report_paths[0].read_bytes()).to_dict()
           assert set(report) == {
+              "schema_version",
               "report_id",
               "report_type",
               "generated_at",
               "alert_count",
               "alerts",
           }
+          assert type(report["schema_version"]) is int
+          assert report["schema_version"] == 1
           assert report["alerts"]
           assert all("explanation" in alert for alert in report["alerts"])
           assert "explanations" not in report
@@ -354,19 +398,23 @@ jobs:
           PY
           python -m sentinellite --config /tmp/sentinellite-explanations.toml scan-auth examples/auth_logs/sample_auth.log
           python - <<'PY'
-          import json
           from pathlib import Path
+
+          from sentinellite.reporting.validation import parse_report_json
 
           report_paths = list(Path("/tmp/sentinellite-config-explanation-smoke").glob("*.json"))
           assert len(report_paths) == 1
-          report = json.loads(report_paths[0].read_text(encoding="utf-8"))
+          report = parse_report_json(report_paths[0].read_bytes()).to_dict()
           assert set(report) == {
+              "schema_version",
               "report_id",
               "report_type",
               "generated_at",
               "alert_count",
               "alerts",
           }
+          assert type(report["schema_version"]) is int
+          assert report["schema_version"] == 1
           assert report["alerts"]
           assert all("explanation" in alert for alert in report["alerts"])
           assert "explanations" not in report

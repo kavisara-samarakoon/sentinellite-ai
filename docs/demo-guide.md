@@ -2,13 +2,15 @@
 
 ## Purpose
 
-This is the deterministic golden path for demonstrating the SentinelLite AI
-`v1.2.0-beta` release surface. It uses bundled, non-sensitive authentication fixtures and isolated
+This is the deterministic golden path for the SentinelLite AI source CLI, including
+the schema-v1 report work for unreleased `v1.3.0-beta` on `feature/v1.3-report-schema-v1`.
+It uses bundled, non-sensitive authentication fixtures and isolated
 temporary output. It does not require elevated privileges, read real authentication-log
 contents, or rely on environment-dependent alert results.
 
 SentinelLite AI is an on-demand local defensive CLI, not a daemon, background monitor,
-production EDR, external notification service, or AI/LLM system.
+production EDR, external notification service, or AI/LLM system. It observes Linux endpoint
+data only when explicitly invoked and reviews reports locally.
 
 ## Safe Demo Shortcut for v1.2.0-beta
 
@@ -30,7 +32,8 @@ is included in the Python package, so the working directory does not need to be 
 checkout. It processes three synthetic authentication records in memory using the normal
 normalization, detection, scoring and JSON report pipeline. It uses built-in rules even
 when observation modules or rules are disabled in a selected config. The report schema
-is unchanged; examples are for learning report review and do not describe the real host.
+is schema v1 on the development branch; published `v1.2.0-beta` reports remain unversioned.
+Examples are for learning report review and do not describe the real host.
 
 `doctor` checks local versions, system, architecture, packaged default configuration,
 dependency imports and report-directory write access. It creates the directory if needed,
@@ -53,7 +56,9 @@ server, browser auto-open, external scripts/assets, network requests, live monit
 automatic remediation. Open the saved file manually for offline review. For a custom demo
 directory, pass that same path with `dashboard export --reports-dir PATH`.
 
-The longer fixture walkthrough below remains available from the source checkout.
+The longer fixture walkthrough below requires a source checkout with the Issue #14 schema
+implementation for its schema-v1 contract check. The published wheel is useful for the
+shortcut above, but does not contain these unreleased contract changes.
 
 ## Prerequisites
 
@@ -98,7 +103,8 @@ sentinellite --help
 Both version commands must print the same version. The help output should describe a local
 defensive observation and report-review CLI, not a resident agent or service.
 
-For this release, both commands print `SentinelLite AI v1.2.0-beta`.
+The published release and this development branch currently both print
+`SentinelLite AI v1.2.0-beta`; version metadata has not yet been changed for release.
 
 ## 3. Show Local Status
 
@@ -172,6 +178,14 @@ Because `report_dir` was fresh and the fixture scan writes one report, this reso
 path. `reports show` does not print alert evidence or raw JSON by default and does not
 regenerate stored explanations.
 
+On the schema-v1 development branch, `reports list` labels new reports `valid (v1)` and
+complete historical reports `valid (legacy)`. `reports show` displays `schema-v1` with
+version `1`, or `legacy-unversioned` with version `unversioned`. Legacy files are not
+rewritten or given a version. Malformed and incompatible reports are `invalid`; future
+schema versions are `unsupported`. Listing still shows valid files in a mixed directory,
+but exits with code 1 when any candidate fails. Showing an invalid or unsupported report
+also exits with code 1 and does not display a partial summary.
+
 ### Export the Static Dashboard
 
 ```bash
@@ -181,6 +195,10 @@ sentinellite dashboard export --reports-dir "$report_dir" \
 
 This reads only the saved local JSON reports. Open the printed HTML path manually to review
 summary cards, breakdowns, and alert/report tables offline. Raw evidence is omitted.
+Only complete validated schema-v1 or historical unversioned reports are loaded. Invalid,
+unsupported, unreadable, or oversized report candidates increase `Skipped files`; symlinks
+and subdirectories are ignored. Each input has a 2 MiB size limit. Neither scores nor
+explanations are regenerated. Missing or empty input produces an empty static dashboard.
 
 ## 7. Export a Local Notification Summary
 
@@ -207,7 +225,9 @@ details, and hashes are excluded.
 
 ## 8. Optional Contract Check
 
-Use the Python standard library to check the two distinct top-level contracts:
+Use the installed canonical parser to validate the complete source report, then check
+the two distinct top-level contracts. This example checks a newly generated schema-v1
+report; complete legacy reports remain readable without acquiring a version:
 
 ```bash
 python - "$report_path" "$notification_path" <<'PY'
@@ -215,17 +235,23 @@ import json
 import sys
 from pathlib import Path
 
-report = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+from sentinellite.reporting.validation import parse_report_json
+
+report = parse_report_json(Path(sys.argv[1]).read_bytes()).to_dict()
 notification = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
 
 assert set(report) == {
+    "schema_version",
     "report_id",
     "report_type",
     "generated_at",
     "alert_count",
     "alerts",
 }
+assert type(report["schema_version"]) is int
+assert report["schema_version"] == 1
 assert "explanations" not in report
+assert type(notification["schema_version"]) is int
 assert notification["schema_version"] == 1
 assert notification["output_type"] == "sentinellite_notification_summary"
 assert notification["included_alert_count"] <= 20

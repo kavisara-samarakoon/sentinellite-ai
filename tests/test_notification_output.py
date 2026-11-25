@@ -216,11 +216,19 @@ def test_serialized_output_excludes_report_location_and_private_alert_content() 
             "alert_count": 1,
             "alerts": [
                 {
+                    "alert_id": "synthetic-alert-001",
                     "rule_id": "AUTH-001",
+                    "rule_name": "Failed SSH Login",
+                    "base_score": 50,
+                    "event_id": "synthetic-event-001",
+                    "event_type": "ssh_failed_login",
+                    "source": "sshd",
+                    "recommendation": "Review the supplied evidence.",
                     "category": "authentication",
                     "severity": "medium",
                     "risk_score": 50,
                     "risk_level": "medium",
+                    "description": "Synthetic stored alert",
                     "message": (
                         "User root at 192.0.2.10 accessed /home/root/private.txt; "
                         "command=sudo cat /etc/shadow; process=suspicious-process"
@@ -234,10 +242,13 @@ def test_serialized_output_excludes_report_location_and_private_alert_content() 
                         "sha256": "d2d2d2d2-private-hash",
                     },
                     "explanation": {
+                        "rule_id": "AUTH-001",
+                        "title": "Synthetic explanation",
+                        "why_it_matched": "The stored event matched a rule.",
+                        "possible_causes": ["A synthetic event"],
+                        "confidence": "medium",
                         "summary": "stored explanation body",
-                        "recommended_actions": [
-                            "stored explanation recommendation"
-                        ],
+                        "recommended_actions": ["stored explanation recommendation"],
                         "evidence_summary": {"username": "root"},
                     },
                 }
@@ -434,7 +445,14 @@ def test_written_json_excludes_sensitive_report_and_alert_fields(tmp_path: Path)
             "alert_count": 1,
             "alerts": [
                 {
+                    "alert_id": "synthetic-alert-001",
                     "rule_id": "AUTH-001",
+                    "rule_name": "Failed SSH Login",
+                    "base_score": 50,
+                    "event_id": "synthetic-event-001",
+                    "event_type": "ssh_failed_login",
+                    "source": "sshd",
+                    "recommendation": "Review the supplied evidence.",
                     "category": "authentication",
                     "severity": "medium",
                     "risk_score": 50,
@@ -444,8 +462,8 @@ def test_written_json_excludes_sensitive_report_and_alert_fields(tmp_path: Path)
                         "sudo PRIVATE_COMMAND --token PRIVATE_TOKEN"
                     ),
                     "description": "PRIVATE_DESCRIPTION",
-                    "raw_data": "PRIVATE_RAW_SOURCE_JSON",
                     "evidence": {
+                        "raw_data": "PRIVATE_RAW_SOURCE_JSON",
                         "username": "PRIVATE_USER",
                         "source_ip": "192.0.2.10",
                         "path": "/private/path",
@@ -454,6 +472,11 @@ def test_written_json_excludes_sensitive_report_and_alert_fields(tmp_path: Path)
                         "sha256": "PRIVATE_HASH",
                     },
                     "explanation": {
+                        "rule_id": "AUTH-001",
+                        "title": "Synthetic explanation",
+                        "why_it_matched": "The stored event matched a rule.",
+                        "possible_causes": ["A synthetic event"],
+                        "confidence": "medium",
                         "summary": "PRIVATE_EXPLANATION",
                         "recommended_actions": ["PRIVATE_RECOMMENDATION"],
                         "evidence_summary": {"path": "/private/explanation/path"},

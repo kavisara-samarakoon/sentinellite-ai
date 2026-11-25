@@ -12,7 +12,14 @@ from sentinellite.main import app
 from sentinellite.reporting.review import load_review_report
 
 runner = CliRunner()
-REPORT_KEYS = {"report_id", "report_type", "generated_at", "alert_count", "alerts"}
+REPORT_KEYS = {
+    "schema_version",
+    "report_id",
+    "report_type",
+    "generated_at",
+    "alert_count",
+    "alerts",
+}
 
 
 @pytest.fixture
@@ -78,6 +85,8 @@ def test_demo_writes_reviewable_synthetic_report_without_reading_files(
     report_path = reports[0]
     report = json.loads(report_path.read_text(encoding="utf-8"))
     assert set(report) == REPORT_KEYS
+    assert type(report["schema_version"]) is int
+    assert report["schema_version"] == 1
     assert report["report_type"] == "sentinellite_alert_report"
     assert report["alert_count"] == 3
     assert [alert["rule_id"] for alert in report["alerts"]] == ["AUTH-001", "AUTH-002", "AUTH-003"]
@@ -116,6 +125,8 @@ def test_demo_respects_reporting_settings_and_prints_runnable_commands(
     (report_path,) = output_dir.glob("*.json")
     report = json.loads(report_path.read_text(encoding="utf-8"))
     assert set(report) == REPORT_KEYS
+    assert type(report["schema_version"]) is int
+    assert report["schema_version"] == 1
     assert report["alert_count"] == 3  # Demo always uses built-in rules, without collection.
     assert all("explanation" in alert for alert in report["alerts"])
     assert f"Saved report: {report_path}" in result.stdout

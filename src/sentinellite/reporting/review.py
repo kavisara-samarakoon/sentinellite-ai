@@ -1,24 +1,63 @@
-import json
 import stat
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-SUPPORTED_REPORT_TYPE = "sentinellite_alert_report"
+from sentinellite.reporting.schema import (
+    ALERT_REPORT_SCHEMA_VERSION,
+    ReportContract,
+    ReportValidationOutcome,
+)
+from sentinellite.reporting.schema import ALERT_REPORT_TYPE as SUPPORTED_REPORT_TYPE
+from sentinellite.reporting.validation import (
+    MalformedReportError as CanonicalMalformedReportError,
+)
+from sentinellite.reporting.validation import (
+    ReportSchemaError,
+    ValidatedReport,
+    parse_report_json,
+)
+from sentinellite.reporting.validation import (
+    UnsupportedSchemaError as CanonicalUnsupportedSchemaError,
+)
+from sentinellite.reporting.validation import (
+    validate_report_data as validate_canonical_report_data,
+)
+
 MAX_REPORT_SIZE_BYTES = 2 * 1024 * 1024
 
 
 class ReportReviewError(Exception):
     """Base error for expected report discovery, loading, and validation failures."""
 
+    outcome: ReportValidationOutcome | None = None
+
 
 class MalformedReportError(ReportReviewError):
     """Raised when a report cannot be decoded or parsed as JSON."""
 
+    outcome = ReportValidationOutcome.MALFORMED
+
 
 class IncompatibleReportError(ReportReviewError):
-    """Raised when parsed JSON does not match the supported alert report shape."""
+    """Raised when parsed JSON does not match a supported alert-report contract."""
+
+    outcome = ReportValidationOutcome.INCOMPATIBLE
+
+
+class UnsupportedSchemaError(ReportReviewError):
+    """Raised when an alert report declares a future schema version."""
+
+    outcome = ReportValidationOutcome.UNSUPPORTED_SCHEMA
+
+    def __init__(self, schema_version: int, path: Path) -> None:
+        self.schema_version = schema_version
+        # Keep arbitrary-size versions as metadata rather than rendering them.
+        super().__init__(
+            f"Unsupported alert-report schema version in report '{path}'. "
+            f"Supported schema version is {ALERT_REPORT_SCHEMA_VERSION}."
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +79,19 @@ class ReviewedReport:
     generated_at: datetime
     alert_count: int
     alerts: tuple[ReviewedAlert, ...]
+    contract: ReportContract | None = None
+
+    @property
+    def schema_version(self) -> int | None:
+        return ALERT_REPORT_SCHEMA_VERSION if self.contract is ReportContract.SCHEMA_V1 else None
+
+    @property
+    def outcome(self) -> ReportValidationOutcome | None:
+        if self.contract is ReportContract.SCHEMA_V1:
+            return ReportValidationOutcome.VALID_SCHEMA_V1
+        if self.contract is ReportContract.LEGACY_UNVERSIONED:
+            return ReportValidationOutcome.VALID_LEGACY_UNVERSIONED
+        return None
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,6 +102,8 @@ class ReportListEntry:
     report_type: str | None
     status: str
     error: str | None
+    contract: ReportContract | None = None
+    outcome: ReportValidationOutcome | None = None
 
 
 def discover_report_paths(report_dir: Path) -> list[Path]:
@@ -109,110 +163,66 @@ def load_review_report(path: Path) -> ReviewedReport:
         )
 
     try:
-        text = encoded_data.decode("utf-8")
-    except UnicodeDecodeError as error:
-        raise MalformedReportError(f"Report file is not valid UTF-8: {path}") from error
-
-    try:
-        data = json.loads(text)
-    except json.JSONDecodeError as error:
-        raise MalformedReportError(
-            f"Malformed JSON in report '{path}' at line {error.lineno}, column {error.colno}."
-        ) from error
-
-    return validate_report_data(data, path)
+        return _project_report(parse_report_json(encoded_data), path)
+    except ReportSchemaError as error:
+        raise _review_error(error, path) from error
+    except RecursionError as error:
+        raise IncompatibleReportError("Report exceeds the review recursion capacity.") from error
 
 
 def validate_report_data(data: object, path: Path) -> ReviewedReport:
-    """Validate parsed report data without mutating the supplied object."""
-    if not isinstance(data, dict):
-        raise IncompatibleReportError(
-            f"Report '{path}' must contain a JSON object at the top level."
-        )
+    """Adapt canonical decoded-data validation to the public review model.
 
-    report_type = data.get("report_type")
-    if report_type != SUPPORTED_REPORT_TYPE:
-        raise IncompatibleReportError(
-            f"Report '{path}' must use supported report_type '{SUPPORTED_REPORT_TYPE}'."
-        )
-
-    report_id = data.get("report_id")
-    if not isinstance(report_id, str) or not report_id.strip():
-        raise IncompatibleReportError(
-            f"Report '{path}' field 'report_id' must be a non-empty string."
-        )
-
-    generated_at_value = data.get("generated_at")
-    if not isinstance(generated_at_value, str):
-        raise IncompatibleReportError(
-            f"Report '{path}' field 'generated_at' must be a timezone-aware ISO datetime string."
-        )
+    Stored JSON must enter through load_review_report so duplicate keys are
+    checked by the canonical parser before any information can be discarded.
+    """
     try:
-        generated_at = datetime.fromisoformat(generated_at_value)
-    except ValueError as error:
-        raise IncompatibleReportError(
-            f"Report '{path}' field 'generated_at' must be a parseable ISO datetime."
-        ) from error
-    if generated_at.tzinfo is None or generated_at.utcoffset() is None:
-        raise IncompatibleReportError(
-            f"Report '{path}' field 'generated_at' must include a timezone offset."
-        )
+        return _project_report(validate_canonical_report_data(data), path)
+    except ReportSchemaError as error:
+        raise _review_error(error, path) from error
+    except RecursionError as error:
+        raise IncompatibleReportError("Report exceeds the review recursion capacity.") from error
 
-    alert_count = data.get("alert_count")
-    if type(alert_count) is not int or alert_count < 0:
-        raise IncompatibleReportError(
-            f"Report '{path}' field 'alert_count' must be a non-negative integer."
-        )
 
-    alerts_data = data.get("alerts")
-    if not isinstance(alerts_data, list):
-        raise IncompatibleReportError(
-            f"Report '{path}' field 'alerts' must be a JSON array."
-        )
-    if len(alerts_data) != alert_count:
-        raise IncompatibleReportError(
-            f"Report '{path}' field 'alert_count' does not match the number of alerts."
-        )
+def _review_error(error: ReportSchemaError, path: Path) -> ReportReviewError:
+    if isinstance(error, CanonicalMalformedReportError):
+        diagnostic = str(error)
+        if not diagnostic.startswith("Malformed JSON"):
+            diagnostic = f"Malformed JSON: {diagnostic}"
+        # Put the safe parser detail before paths so bounded CLI rendering keeps
+        # syntax locations visible even for long report paths.
+        return MalformedReportError(f"{diagnostic} Report: '{path}'.")
+    if isinstance(error, CanonicalUnsupportedSchemaError):
+        return UnsupportedSchemaError(error.schema_version, path)
+    # Canonical incompatibility diagnostics can contain user-supplied evidence
+    # keys. Retain the cause for callers but do not expose it in CLI diagnostics.
+    return IncompatibleReportError(
+        f"Incompatible report '{path}': expected supported report_type "
+        f"'{SUPPORTED_REPORT_TYPE}' and a complete schema-v1 or legacy-unversioned contract."
+    )
 
-    reviewed_alerts: list[ReviewedAlert] = []
-    for index, alert_data in enumerate(alerts_data):
-        if not isinstance(alert_data, dict):
-            raise IncompatibleReportError(
-                f"Report '{path}' alert at index {index} must be a JSON object."
-            )
 
-        rule_id = _require_alert_string(alert_data, "rule_id", index, path)
-        severity = _require_alert_string(alert_data, "severity", index, path)
-        risk_level = _require_alert_string(alert_data, "risk_level", index, path)
-        category = _require_alert_string(alert_data, "category", index, path)
-        message = _require_alert_string(alert_data, "message", index, path)
-
-        risk_score = alert_data.get("risk_score")
-        if type(risk_score) is not int:
-            raise IncompatibleReportError(
-                f"Report '{path}' alert at index {index} field 'risk_score' "
-                "must be an integer."
-            )
-
-        reviewed_alerts.append(
-            ReviewedAlert(
-                rule_id=rule_id,
-                severity=severity,
-                risk_level=risk_level,
-                risk_score=risk_score,
-                category=category,
-                message=message,
-                has_explanation=isinstance(alert_data.get("explanation"), dict),
-            )
-        )
-
+def _project_report(validated: ValidatedReport, path: Path) -> ReviewedReport:
+    data = validated.to_dict()
     return ReviewedReport(
         path=path,
-        report_id=report_id,
-        report_type=report_type,
-        generated_at=generated_at,
-        alert_count=alert_count,
-        alerts=tuple(reviewed_alerts),
+        report_id=data["report_id"],
+        report_type=data["report_type"],
+        generated_at=datetime.fromisoformat(data["generated_at"].replace("z", "Z")),
+        alert_count=data["alert_count"],
+        alerts=tuple(
+            ReviewedAlert(
+                rule_id=alert["rule_id"],
+                severity=alert["severity"],
+                risk_level=alert["risk_level"],
+                risk_score=alert["risk_score"],
+                category=alert["category"],
+                message=alert["message"],
+                has_explanation="explanation" in alert,
+            )
+            for alert in data["alerts"]
+        ),
+        contract=validated.contract,
     )
 
 
@@ -233,6 +243,7 @@ def list_report_entries(report_dir: Path) -> list[ReportListEntry]:
                     report_type=None,
                     status="invalid",
                     error=str(error),
+                    outcome=error.outcome,
                 )
             )
             continue
@@ -245,6 +256,8 @@ def list_report_entries(report_dir: Path) -> list[ReportListEntry]:
                 report_type=report.report_type,
                 status="valid",
                 error=None,
+                contract=report.contract,
+                outcome=report.outcome,
             )
         )
 
@@ -263,6 +276,8 @@ def build_report_summary(report: ReviewedReport) -> dict[str, object]:
         "path": str(report.path),
         "report_id": report.report_id,
         "report_type": report.report_type,
+        "contract": report.contract.value if report.contract is not None else None,
+        "schema_version": report.schema_version,
         "generated_at": report.generated_at.isoformat(),
         "alert_count": report.alert_count,
         "explanation_count": sum(alert.has_explanation for alert in report.alerts),
@@ -270,17 +285,3 @@ def build_report_summary(report: ReviewedReport) -> dict[str, object]:
         "severity_counts": dict(sorted(severity_counts.items())),
         "risk_level_counts": dict(sorted(risk_level_counts.items())),
     }
-
-
-def _require_alert_string(
-    alert_data: dict[object, object],
-    field_name: str,
-    index: int,
-    path: Path,
-) -> str:
-    value = alert_data.get(field_name)
-    if not isinstance(value, str):
-        raise IncompatibleReportError(
-            f"Report '{path}' alert at index {index} field '{field_name}' must be a string."
-        )
-    return value

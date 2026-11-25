@@ -46,6 +46,7 @@ from sentinellite.reporting.review import (
     list_report_entries,
     load_review_report,
 )
+from sentinellite.reporting.schema import ReportContract, ReportValidationOutcome
 
 console = Console()
 CURRENT_VERSION = __version__
@@ -501,9 +502,7 @@ def reports_list_command(
 ) -> None:
     """List local SentinelLite JSON alert reports without modifying them."""
     effective_report_dir = (
-        report_dir
-        if report_dir is not None
-        else _selected_config(ctx).reporting.output_dir
+        report_dir if report_dir is not None else _selected_config(ctx).reporting.output_dir
     )
 
     try:
@@ -532,7 +531,7 @@ def reports_list_command(
     table.add_column("Alerts", justify="right")
     table.add_column("Report Type")
     table.add_column("Status")
-    table.add_column("File")
+    table.add_column("File", min_width=18)
 
     invalid_entries = []
     for entry in entries:
@@ -543,12 +542,19 @@ def reports_list_command(
         alert_count = str(entry.alert_count) if entry.alert_count is not None else "-"
         report_type = entry.report_type if entry.report_type is not None else "-"
         status_style = "green" if entry.status == "valid" else "red"
+        status = entry.status
+        if entry.contract is ReportContract.SCHEMA_V1:
+            status = "valid (v1)"
+        elif entry.contract is ReportContract.LEGACY_UNVERSIONED:
+            status = "valid (legacy)"
+        elif entry.outcome is ReportValidationOutcome.UNSUPPORTED_SCHEMA:
+            status = "unsupported"
 
         table.add_row(
             _literal_text(generated_at, max_length=40),
             _literal_text(alert_count, max_length=12),
             _literal_text(report_type, max_length=40),
-            _literal_text(entry.status, max_length=16, style=status_style),
+            _literal_text(status, max_length=16, style=status_style),
             _literal_text(entry.path.name, max_length=80),
         )
 
@@ -592,6 +598,13 @@ def reports_show_command(report_path: Path) -> None:
     summary_table.add_row(
         "Report type",
         _literal_text(summary["report_type"], max_length=60),
+    )
+    summary_table.add_row("Report contract", _literal_text(summary["contract"]))
+    summary_table.add_row(
+        "Schema version",
+        _literal_text(
+            summary["schema_version"] if summary["schema_version"] is not None else "unversioned"
+        ),
     )
     summary_table.add_row(
         "Generated timestamp",

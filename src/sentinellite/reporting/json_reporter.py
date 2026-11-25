@@ -1,12 +1,14 @@
 import json
 from collections.abc import Sequence
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field, fields, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from sentinellite.explanations.evidence import build_alert_evidence_summary
 from sentinellite.explanations.generator import generate_alert_explanation
+from sentinellite.reporting.schema import ALERT_REPORT_SCHEMA_VERSION, ALERT_REPORT_TYPE
+from sentinellite.reporting.validation import validate_report_data
 from sentinellite.scoring.risk import ScoredAlert
 
 
@@ -17,9 +19,13 @@ class AlertReport:
     generated_at: str
     alert_count: int
     alerts: list[dict[str, Any]] = field(default_factory=list)
+    schema_version: int = field(default=ALERT_REPORT_SCHEMA_VERSION, init=False)
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        # Validate original values before copying: asdict can silently convert
+        # dataclass evidence into dictionaries and rebuild Python containers.
+        data = {item.name: getattr(self, item.name) for item in fields(self)}
+        return validate_report_data(data).to_dict()
 
 
 def create_alert_report(
@@ -32,22 +38,26 @@ def create_alert_report(
     alerts: list[dict[str, Any]] = []
 
     for alert in scored_alerts:
-        alert_dict = alert.to_dict()
+        alert_dict = {item.name: getattr(alert, item.name) for item in fields(alert)}
         if include_explanations:
             explanation = generate_alert_explanation(
                 alert.rule_id,
                 build_alert_evidence_summary(alert),
             )
-            alert_dict["explanation"] = explanation.to_dict()
+            alert_dict["explanation"] = {
+                item.name: getattr(explanation, item.name) for item in fields(explanation)
+            }
         alerts.append(alert_dict)
 
-    return AlertReport(
+    report = AlertReport(
         report_id=report_id,
-        report_type="sentinellite_alert_report",
+        report_type=ALERT_REPORT_TYPE,
         generated_at=generated_at,
         alert_count=len(scored_alerts),
         alerts=alerts,
     )
+    # Preserve the existing detached alert/evidence snapshot in the public result.
+    return replace(report, alerts=report.to_dict()["alerts"])
 
 
 def write_alert_report(
@@ -58,8 +68,6 @@ def write_alert_report(
     include_explanations: bool = False,
 ) -> Path:
     output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-
     report = create_alert_report(
         scored_alerts,
         include_explanations=include_explanations,
@@ -69,8 +77,10 @@ def write_alert_report(
     report_filename = filename or f"alerts-{safe_timestamp}.json"
     report_path = output_path / report_filename
 
+    serialized = json.dumps(report.to_dict(), indent=2, allow_nan=False)
+    output_path.mkdir(parents=True, exist_ok=True)
     with report_path.open("w", encoding="utf-8") as file:
-        json.dump(report.to_dict(), file, indent=2)
+        file.write(serialized)
 
     return report_path
 
