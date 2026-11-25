@@ -6,6 +6,7 @@ import stat
 from datetime import UTC, datetime
 from html import escape
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -459,7 +460,10 @@ def test_non_regular_descriptor_is_rejected_and_closed(
         return result
 
     monkeypatch.setattr(dashboard, "discover_report_paths", lambda directory: [path])
-    monkeypatch.setattr(dashboard.os, "fstat", tracked_fstat)
+    isolated_os = SimpleNamespace(**vars(dashboard.os))
+    isolated_os.fstat = tracked_fstat
+    monkeypatch.setattr(dashboard, "os", isolated_os)
+    assert os.fstat is original_fstat
     loaded = load_dashboard_data(tmp_path)
     assert (loaded.reports_loaded, loaded.reports_skipped) == (0, 1)
     assert len(descriptors) == 1
