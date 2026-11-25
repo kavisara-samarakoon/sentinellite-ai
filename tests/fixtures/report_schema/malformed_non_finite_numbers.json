@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "report_id": "sentinellite-report-2026-01-01T00:00:00+00:00",
+  "report_type": "sentinellite_alert_report",
+  "generated_at": "2026-01-01T00:00:00+00:00",
+  "alert_count": 1,
+  "alerts": [
+    {
+      "alert_id": "synthetic-alert-001",
+      "rule_id": "AUTH-001",
+      "rule_name": "Failed SSH Login",
+      "category": "authentication",
+      "severity": "medium",
+      "base_score": 50,
+      "risk_score": 50,
+      "risk_level": "high",
+      "event_id": "synthetic-event-001",
+      "event_type": "ssh_failed_login",
+      "source": "sshd",
+      "message": "Synthetic failed SSH authentication attempt",
+      "description": "A synthetic rule match for report contract testing.",
+      "recommendation": "Review the synthetic authentication evidence.",
+      "evidence": {
+        "synthetic": true,
+        "attempt_count": 1,
+        "details": {
+          "labels": [
+            "synthetic",
+            "contract"
+          ],
+          "optional_value": null,
+          "measurements": [
+            0,
+            NaN,
+            Infinity,
+            -Infinity,
+            false
+          ]
+        }
+      }
+    }
+  ]
+}

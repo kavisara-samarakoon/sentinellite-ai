@@ -10,6 +10,7 @@ from sentinellite.reporting.review import load_review_report
 from sentinellite.scoring.risk import ScoredAlert
 
 REPORT_KEYS = {
+    "schema_version",
     "report_id",
     "report_type",
     "generated_at",
@@ -97,6 +98,8 @@ def test_traditional_linux_fixture_report_preserves_review_compatibility(
         "AUTH-003",
     ]
     assert set(report_data) == REPORT_KEYS
+    assert type(report_data["schema_version"]) is int
+    assert report_data["schema_version"] == 1
     assert report_data["report_type"] == "sentinellite_alert_report"
     assert report_data["alert_count"] == 3
     assert len(report_data["alerts"]) == 3

@@ -124,7 +124,16 @@ sentinellite reports export-notification "$report_path" \
 - [ ] No real host authentication log is read or scanned.
 - [ ] Fixture event and alert counts match the tested expectation.
 - [ ] `reports list` and `reports show` accept the generated alert report.
-- [ ] Default alert-report top-level keys match [Data Contracts](data-contracts.md) exactly.
+- [ ] New alert reports pass the canonical `parse_report_json()` validator and contain
+      exactly `schema_version`, `report_id`, `report_type`, `generated_at`, `alert_count`,
+      and `alerts`, as specified in [Data Contracts](data-contracts.md).
+- [ ] Alert-report `schema_version` is integer `1`, never a boolean.
+- [ ] Complete historical unversioned reports pass validation as `legacy-unversioned`
+      without being rewritten or silently upgraded.
+- [ ] Future report versions are rejected as unsupported; malformed and incompatible
+      inputs fail without partial projections. Alerts and optional explanations validate fully.
+- [ ] `reports list` distinguishes `valid (v1)`, `valid (legacy)`, `invalid`, and `unsupported`;
+      `reports show` displays the correct contract/version and rejects invalid inputs.
 - [ ] No default report has a top-level or per-alert explanation.
 - [ ] An opt-in explained report keeps the same top-level keys and nests explanations per alert.
 - [ ] Notification schema version remains `1` and its exact keys pass assertions.
@@ -153,6 +162,8 @@ test -s "$dashboard_root/dashboard.html"
 - [ ] The saved HTML opens manually as a local file, with no server or browser auto-open.
 - [ ] Dashboard export reads only existing local reports and leaves them unchanged.
 - [ ] No external scripts/assets, network requests, live monitoring, or remediation occur.
+- [ ] Dashboard accepts complete schema-v1 and legacy reports, counts invalid and unsupported
+      candidates as skipped, and preserves source files, stored scores, and explanations.
 - [ ] Regression tests cover empty input, invalid reports, and HTML escaping.
 
 ## 6. Platform Validation
@@ -182,7 +193,8 @@ test -s "$dashboard_root/dashboard.html"
 
 ## 7. PR, Tag, and GitHub Pre-release
 
-- [ ] The GitHub pull request shows passing CI for the final reviewed commit.
+- [ ] The GitHub pull request shows passing full-suite CI for the final reviewed commit
+      on both configured Python versions, including canonical report contract assertions.
 - [ ] Review confirms no out-of-scope capability or safety-boundary change.
 - [ ] Final release notes match the validated behavior and known limitations.
 - [ ] The annotated release tag points to the exact reviewed release commit.

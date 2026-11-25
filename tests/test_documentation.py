@@ -1,5 +1,9 @@
+import json
 import re
 from pathlib import Path
+
+from sentinellite.reporting.schema import ReportContract
+from sentinellite.reporting.validation import parse_report_json
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CURRENT_DOCUMENTS = (
@@ -13,6 +17,7 @@ CURRENT_DOCUMENTS = (
     PROJECT_ROOT / "docs/release-notes-v1.1.0-beta.md",
     PROJECT_ROOT / "docs/release-notes-v1.2.0-beta.md",
     PROJECT_ROOT / "docs/integrations/arm-secnet.md",
+    PROJECT_ROOT / "tests/fixtures/report_schema/README.md",
 )
 MARKDOWN_LINK_PATTERN = re.compile(r"\[[^]]+\]\(([^)]+)\)")
 
@@ -46,6 +51,9 @@ def test_readme_exposes_current_install_and_release_documents() -> None:
     assert "releases/tag/v1.1.0-beta" in readme
     assert "previous published release was\n[v1.1.0-beta]" in readme
     assert "current published milestone is `v0.9.0-alpha`" not in readme.lower()
+    assert "Unreleased `v1.3.0-beta` development for Issue #14" in readme
+    assert "Published `v1.2.0-beta` artifacts retain their historical report format" in readme
+    assert "Package and CLI version metadata still display `v1.2.0-beta`" in readme
 
 
 def test_beta_release_notes_are_published_and_safety_scoped() -> None:
@@ -75,13 +83,15 @@ def test_beta_release_notes_are_published_and_safety_scoped() -> None:
     assert "no automatic remediation" in normalized_notes
 
 
-def test_beta_data_contract_documentation_preserves_existing_schemas() -> None:
+def test_data_contract_documentation_covers_v1_legacy_and_consumer_outcomes() -> None:
     contracts = (PROJECT_ROOT / "docs/data-contracts.md").read_text(
         encoding="utf-8"
     )
+    normalized_contracts = " ".join(contracts.split())
 
-    assert "exactly these five top-level fields" in contracts
+    assert "exactly these six top-level fields" in contracts
     for field_name in (
+        "schema_version",
         "report_id",
         "report_type",
         "generated_at",
@@ -90,10 +100,36 @@ def test_beta_data_contract_documentation_preserves_existing_schemas() -> None:
     ):
         assert f"- `{field_name}`" in contracts
     assert "There is no top-level `explanations` field" in contracts
-    assert "does not add a top-level `schema_version`" in contracts
+    assert "`schema_version` must be the integer `1`, not a boolean" in contracts
+    assert "complete historical report has exactly the five envelope fields" in contracts
+    assert "does not add a version or modify its source file" in normalized_contracts
+    assert "parse_report_json()" in contracts
+    for classification in ("valid (v1)", "valid (legacy)", "unsupported", "invalid"):
+        assert f"`{classification}`" in contracts
+    assert "exits with code 1 if any" in contracts
+    assert "Skipped files" in contracts
+    assert "2 MiB" in contracts
+    assert "Future report bodies are" in contracts
     assert "notification summary is a separate artifact" in contracts.lower()
     assert "`schema_version` remains the integer `1`" in contracts
     assert "At most 20 alerts are included" in contracts
+
+
+def test_documented_report_and_explanation_examples_are_complete_and_valid() -> None:
+    contracts = (PROJECT_ROOT / "docs/data-contracts.md").read_text(encoding="utf-8")
+    examples = re.findall(r"```json\n(.*?)\n```", contracts, flags=re.DOTALL)
+    assert len(examples) == 3
+    report = parse_report_json(examples[0])
+    assert report.contract is ReportContract.SCHEMA_V1
+    assert type(report.schema_version) is int and report.schema_version == 1
+    explained = report.to_dict()
+    explained["alerts"][0]["explanation"] = json.loads(examples[1])
+    assert parse_report_json(json.dumps(explained)).contract is ReportContract.SCHEMA_V1
+    legacy = report.to_dict()
+    del legacy["schema_version"]
+    validated = parse_report_json(json.dumps(legacy))
+    assert validated.contract is ReportContract.LEGACY_UNVERSIONED
+    assert "schema_version" not in validated.to_dict()
 
 
 def test_demo_uses_fixture_first_non_destructive_flow() -> None:

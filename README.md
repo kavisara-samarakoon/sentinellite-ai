@@ -18,6 +18,12 @@ for the local static dashboard and ARM-SecNet lab validation milestone. See the
 and [release history](#release-history) for earlier milestones.
 SentinelLite AI is beta-stage software, not a production EDR, and is not published to PyPI.
 
+Unreleased `v1.3.0-beta` development for Issue #14 is on
+`feature/v1.3-report-schema-v1`. The report-contract descriptions below apply to that
+source branch: new reports use schema v1, and complete historical unversioned reports
+remain readable. Published `v1.2.0-beta` artifacts retain their historical report format.
+Package and CLI version metadata still display `v1.2.0-beta`; no new release is claimed.
+
 The automated suite covers configuration, collectors,
 normalization, detection, scoring, reporting, deterministic explanations, local report
 review, notification-summary export, packaging, and CLI behavior.
@@ -206,12 +212,15 @@ summary fields; raw evidence and raw log data are omitted.
 `--limit` must be positive. It caps the newest reports displayed and the combined alert
 table separately. The total reports loaded counts all compatible reports; alert counts,
 breakdowns, and highest severity describe only the displayed alerts. Times are shown in
-UTC; missing, invalid, or timezone-free times sort last, with report time used when an
-alert has no usable timestamp. Missing optional fields display a placeholder.
+UTC using validated report times; supported alerts have no separate timestamp field.
+Equal times retain deterministic filename and stored-alert ordering. Empty display text
+uses the existing fallback text or a placeholder.
 
 Only regular `.json` files directly inside the selected directory are considered. Symlinks
-and subdirectories are ignored; malformed, incompatible, unreadable, or oversized reports
-are skipped. Each report is limited to 2 MB. A missing or empty reports directory produces
+and subdirectories are ignored. Only complete schema-v1 or verified legacy-unversioned
+reports are loaded; malformed, incompatible, unsupported-schema, unreadable, or oversized
+reports are skipped and included in the skipped count. Each report is limited to 2 MiB.
+A missing or empty reports directory produces
 an empty dashboard. The output parent directory is created if needed. Use an `.html` or
 `.htm` output path; output symlinks and JSON destinations are rejected. Existing dashboard
 HTML can be replaced safely while source reports remain unchanged.
@@ -339,6 +348,13 @@ alert report and never repairs or changes the observed files.
 Alert reports go to `reports/` by default. Generated notification summaries should go to
 `notifications/` or another separate directory because they use a different contract.
 
+The source writer emits exactly `schema_version`, `report_id`, `report_type`,
+`generated_at`, `alert_count`, and `alerts`. `schema_version` is integer `1`, never a
+boolean. Optional stored explanations are nested in each alert and enabled by
+`--include-explanations` or the explicitly selected TOML reporting setting.
+Complete historical reports without a version remain `legacy-unversioned` and are
+never silently upgraded. Unsupported future versions are rejected.
+
 ```bash
 sentinellite reports list
 sentinellite reports show REPORT_PATH
@@ -346,6 +362,13 @@ mkdir -p notifications
 sentinellite reports export-notification REPORT_PATH \
   --output notifications/alert-summary.json
 ```
+
+`reports list` labels reports `valid (v1)`, `valid (legacy)`, `unsupported`, or `invalid`.
+It retains valid entries in a mixed directory and exits with code 1 if any candidate
+is invalid or unsupported. `reports show` identifies the contract and schema version;
+invalid or unsupported reports exit with code 1 without partial report projections.
+Both use the canonical validator, requiring complete alerts and optional explanations,
+and do not regenerate explanations or recalculate risk scores.
 
 Notification export uses stored report data, refuses to overwrite an existing output,
 does not modify the source report, and performs no delivery. Although privacy-minimized,

@@ -1,4 +1,5 @@
 import json
+import sys
 import tomllib
 from pathlib import Path
 
@@ -22,10 +23,31 @@ from sentinellite.pipeline.file_integrity_scan import FileIntegrityScanSummary
 from sentinellite.pipeline.network_scan import NetworkScanSummary
 from sentinellite.pipeline.process_scan import ProcessScanSummary
 from sentinellite.reporting.review import IncompatibleReportError, load_review_report
+from sentinellite.reporting.schema import ReportValidationOutcome
+from sentinellite.reporting.validation import ReportSchemaError, parse_report_json
 from sentinellite.scoring.risk import ScoredAlert
 
 runner = CliRunner()
+REVIEW_FIXTURE_CASES = [
+    ("schema_v1_alert.json", "schema-v1"),
+    ("schema_v1_explanation.json", "schema-v1"),
+    ("schema_v1_empty.json", "schema-v1"),
+    ("legacy_unversioned_alert.json", "legacy-unversioned"),
+    ("legacy_unversioned_explanation.json", "legacy-unversioned"),
+    ("unsupported_schema_version.json", "Unsupported"),
+    ("incompatible_missing_alert_field.json", "Incompatible report"),
+    ("incompatible_alert_count.json", "Incompatible report"),
+    ("incompatible_boolean_risk_score.json", "Incompatible report"),
+    ("incompatible_report_type.json", "Incompatible report"),
+    ("incompatible_incomplete_explanation.json", "Incompatible report"),
+    ("incompatible_explanation_rule_id.json", "Incompatible report"),
+    ("malformed_json_syntax.json", "Malformed JSON"),
+    ("malformed_duplicate_top_level_key.json", "Malformed JSON"),
+    ("malformed_duplicate_nested_key.json", "Malformed JSON"),
+    ("malformed_non_finite_numbers.json", "Malformed JSON"),
+]
 REPORT_KEYS = {
+    "schema_version",
     "report_id",
     "report_type",
     "generated_at",
@@ -80,15 +102,22 @@ def write_reporting_config(
     return config_path
 
 
+REPORT_FIXTURES = Path(__file__).resolve().parent / "fixtures" / "report_schema"
+
+
+def review_explanation(**overrides: object) -> dict[str, object]:
+    explanation = json.loads(
+        (REPORT_FIXTURES / "legacy_unversioned_explanation.json").read_text(encoding="utf-8")
+    )["alerts"][0]["explanation"]
+    explanation.update(overrides)
+    return explanation
+
+
 def review_alert(**overrides: object) -> dict[str, object]:
-    alert: dict[str, object] = {
-        "rule_id": "AUTH-001",
-        "severity": "medium",
-        "risk_level": "medium",
-        "risk_score": 50,
-        "category": "authentication",
-        "message": "Failed SSH login attempt",
-    }
+    alert = json.loads(
+        (REPORT_FIXTURES / "legacy_unversioned_alert.json").read_text(encoding="utf-8")
+    )["alerts"][0]
+    alert.update(risk_level="medium", message="Failed SSH login attempt")
     alert.update(overrides)
     return alert
 
@@ -666,6 +695,8 @@ def test_config_disabling_auth_rule_suppresses_only_failed_login_alerts(
     report_path = next((tmp_path / "configured-reports").glob("*.json"))
     report = json.loads(report_path.read_text(encoding="utf-8"))
     assert set(report) == REPORT_KEYS
+    assert type(report["schema_version"]) is int
+    assert report["schema_version"] == 1
     assert [alert["rule_id"] for alert in report["alerts"]] == [
         "AUTH-002",
         "AUTH-003",
@@ -797,6 +828,8 @@ def test_config_disabling_changed_file_rule_flows_through_baseline_scan(
     report_path = next((tmp_path / "configured-reports").glob("*.json"))
     report = json.loads(report_path.read_text(encoding="utf-8"))
     assert set(report) == REPORT_KEYS
+    assert type(report["schema_version"]) is int
+    assert report["schema_version"] == 1
     assert report["alerts"] == []
     assert "FIM-004" not in result.stdout
     assert "No baseline file integrity alerts generated." in result.stdout
@@ -832,7 +865,7 @@ def test_invalid_disabled_rule_fails_before_scan_pipeline(
     assert not (tmp_path / "configured-reports").exists()
 
 
-def test_config_output_dir_and_false_explanations_write_legacy_json(
+def test_config_output_dir_and_false_explanations_write_schema_v1_json(
     tmp_path: Path,
 ) -> None:
     config_path = write_reporting_config(tmp_path, include_explanations=False)
@@ -853,6 +886,8 @@ def test_config_output_dir_and_false_explanations_write_legacy_json(
     assert len(report_paths) == 1
     report = json.loads(report_paths[0].read_text(encoding="utf-8"))
     assert set(report) == REPORT_KEYS
+    assert type(report["schema_version"]) is int
+    assert report["schema_version"] == 1
     assert report["alerts"]
     assert all("explanation" not in alert for alert in report["alerts"])
     assert "Deterministic Alert Explanations" in result.stdout
@@ -896,6 +931,8 @@ def test_config_true_writes_nested_json_explanations(tmp_path: Path) -> None:
     report_path = next((tmp_path / "configured-reports").glob("*.json"))
     report = json.loads(report_path.read_text(encoding="utf-8"))
     assert set(report) == REPORT_KEYS
+    assert type(report["schema_version"]) is int
+    assert report["schema_version"] == 1
     assert report["alerts"]
     assert all("explanation" in alert for alert in report["alerts"])
     assert "explanations" not in report
@@ -1037,7 +1074,7 @@ def test_config_file_in_current_directory_is_not_auto_discovered(
     }
 
 
-def test_scan_auth_command_without_flag_writes_legacy_json(tmp_path: Path) -> None:
+def test_scan_auth_command_without_flag_writes_schema_v1_json(tmp_path: Path) -> None:
     result = runner.invoke(
         app,
         [
@@ -1053,6 +1090,8 @@ def test_scan_auth_command_without_flag_writes_legacy_json(tmp_path: Path) -> No
     assert len(report_paths) == 1
     report = json.loads(report_paths[0].read_text(encoding="utf-8"))
     assert set(report) == REPORT_KEYS
+    assert type(report["schema_version"]) is int
+    assert report["schema_version"] == 1
     assert report["alerts"]
     assert all("explanation" not in alert for alert in report["alerts"])
     assert "Deterministic Alert Explanations" in result.stdout
@@ -1075,13 +1114,13 @@ def test_scan_auth_command_with_flag_writes_json_explanations(tmp_path: Path) ->
     assert len(report_paths) == 1
     report = json.loads(report_paths[0].read_text(encoding="utf-8"))
     assert set(report) == REPORT_KEYS
+    assert type(report["schema_version"]) is int
+    assert report["schema_version"] == 1
     assert report["alerts"]
     assert all("explanation" in alert for alert in report["alerts"])
     assert "Deterministic Alert Explanations" in result.stdout
 
-    explanation_text = json.dumps(
-        [alert["explanation"] for alert in report["alerts"]]
-    ).lower()
+    explanation_text = json.dumps([alert["explanation"] for alert in report["alerts"]]).lower()
     assert "ai detected" not in explanation_text
     assert "malware detected" not in explanation_text
     assert "confirmed compromise" not in explanation_text
@@ -1284,8 +1323,7 @@ def test_scan_network_command_displays_summary_and_alerts(
                     "risk_level": "medium",
                     "risk_score": 55,
                     "message": (
-                        "Observed network connection at 127.0.0.1:8080 "
-                        "with no remote endpoint"
+                        "Observed network connection at 127.0.0.1:8080 with no remote endpoint"
                     ),
                 }
             ]
@@ -1580,13 +1618,9 @@ def test_scan_files_baseline_displays_alert_after_file_changes(tmp_path: Path) -
     report_paths = list(output_dir.glob("*.json"))
     assert len(report_paths) == 1
     report = json.loads(report_paths[0].read_text(encoding="utf-8"))
-    assert set(report) == {
-        "report_id",
-        "report_type",
-        "generated_at",
-        "alert_count",
-        "alerts",
-    }
+    assert set(report) == REPORT_KEYS
+    assert type(report["schema_version"]) is int
+    assert report["schema_version"] == 1
     assert all("explanation" not in alert for alert in report["alerts"])
 
 
@@ -1723,9 +1757,7 @@ def test_auth_sources_list_does_not_print_contents_and_renders_literal_values(
     secret_content = "private-authentication-log-content"
     log_path.write_text(secret_content, encoding="utf-8")
     original_content = log_path.read_text(encoding="utf-8")
-    entries = (
-        AuthLogSourceEntry("[f]", log_path, "[s]", "[d]\nline"),
-    )
+    entries = (AuthLogSourceEntry("[f]", log_path, "[s]", "[d]\nline"),)
     monkeypatch.setattr(
         "sentinellite.main.discover_auth_log_sources",
         lambda _candidates: entries,
@@ -2395,10 +2427,10 @@ def test_reports_show_counts_and_marks_stored_explanations_without_body(
         tmp_path / "reports",
         alerts=[
             review_alert(
-                explanation={
-                    "summary": "NEVER_RENDER_STORED_EXPLANATION_BODY",
-                    "recommended_actions": ["Do not render this"],
-                }
+                explanation=review_explanation(
+                    summary="NEVER_RENDER_STORED_EXPLANATION_BODY",
+                    recommended_actions=["Do not render this"],
+                )
             ),
             review_alert(
                 rule_id="NET-001",
@@ -2516,7 +2548,7 @@ def test_reports_show_does_not_regenerate_explanations(
 ) -> None:
     report_path = write_review_report(
         tmp_path / "reports",
-        alerts=[review_alert(explanation={"summary": "Stored only"})],
+        alerts=[review_alert(explanation=review_explanation(summary="Stored only"))],
     )
 
     def fail_if_called(*_args: object, **_kwargs: object) -> None:
@@ -2825,7 +2857,7 @@ def test_reports_export_notification_omits_private_content_from_cli_and_json(
                     "username": private_values[1],
                     "source_ip": private_values[2],
                 },
-                explanation={"summary": private_values[6]},
+                explanation=review_explanation(summary=private_values[6]),
             )
         ],
     )
@@ -3032,6 +3064,8 @@ def test_real_auth_fixture_scan_to_notification_export_preserves_report_contract
     source_before = report_path.read_bytes()
     source_data = json.loads(source_before)
     assert set(source_data) == REPORT_KEYS
+    assert type(source_data["schema_version"]) is int
+    assert source_data["schema_version"] == 1
     assert source_data["report_type"] == "sentinellite_alert_report"
     assert source_data["alert_count"] == 3
     assert len(source_data["alerts"]) == 3
@@ -3122,3 +3156,261 @@ def test_real_auth_fixture_scan_to_notification_export_preserves_report_contract
     assert load_review_report(report_path).alert_count == 3
     with pytest.raises(IncompatibleReportError, match="supported report_type"):
         load_review_report(notification_path)
+
+
+@pytest.mark.parametrize(("filename", "classification"), REVIEW_FIXTURE_CASES)
+@pytest.mark.parametrize("command", ["list", "show"])
+def test_reports_cli_classifies_approved_fixtures_without_rewriting(
+    filename: str,
+    classification: str,
+    command: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    path = Path("report.json")
+    original = (REPORT_FIXTURES / filename).read_bytes()
+    path.write_bytes(original)
+    arguments = (
+        ["reports", "show", str(path)]
+        if command == "show"
+        else ["reports", "list", "--report-dir", "."]
+    )
+    result = runner.invoke(app, arguments, terminal_width=200)
+    valid = classification in ("schema-v1", "legacy-unversioned")
+    assert result.exit_code == (0 if valid else 1), result.output
+    assert path.name in result.stdout
+    if valid and command == "show":
+        assert classification in result.stdout
+        assert "Schema version" in result.stdout
+        assert (
+            "unversioned" in result.stdout
+            if classification == "legacy-unversioned"
+            else "unversioned" not in result.stdout
+        )
+    elif valid:
+        assert (
+            "valid (v1)" if classification == "schema-v1" else "valid (legacy)"
+        ) in result.stdout
+    else:
+        assert classification in result.stdout
+        if classification == "Unsupported":
+            assert "Stored Alerts" not in result.stdout
+            assert "Report ID" not in result.stdout
+            if command == "list":
+                assert "unsupported" in result.stdout
+    assert "Traceback" not in result.stdout
+    assert path.read_bytes() == original
+
+
+@pytest.mark.parametrize("command", ["list", "show"])
+@pytest.mark.parametrize(
+    ("payload", "classification"),
+    [
+        (b'{"private":"DO_NOT_RENDER", "private":"DO_NOT_RENDER"}', "Malformed JSON"),
+        (b'{"private":NaN, "secret":"DO_NOT_RENDER"}', "Malformed JSON"),
+        (b'{"private":Infinity, "secret":"DO_NOT_RENDER"}', "Malformed JSON"),
+        (b'{"private":-Infinity, "secret":"DO_NOT_RENDER"}', "Malformed JSON"),
+        (b'{"private":1e9999, "secret":"DO_NOT_RENDER"}', "Malformed JSON"),
+        (b"\xffDO_NOT_RENDER", "Malformed JSON"),
+        (
+            (
+                b'{"report_type":"sentinellite_alert_report", "schema_version":2, '
+                b'"report_id":"DO_NOT_RENDER", "alert_count":999999, "alerts":"FUTURE_PRIVATE_BODY"}'
+            ),
+            "Unsupported",
+        ),
+    ],
+)
+def test_reports_cli_safe_errors_do_not_block_valid_list_entries(
+    payload: bytes,
+    classification: str,
+    command: str,
+    tmp_path: Path,
+) -> None:
+    invalid = tmp_path / "bad.json"
+    invalid.write_bytes(payload)
+    valid = write_review_report(tmp_path, filename="good.json")
+    arguments = (
+        ["reports", "show", str(invalid)]
+        if command == "show"
+        else ["reports", "list", "--report-dir", str(tmp_path)]
+    )
+    result = runner.invoke(app, arguments, terminal_width=180)
+    assert result.exit_code == 1
+    assert classification in result.stdout
+    assert "DO_NOT_RENDER" not in result.stdout
+    assert "FUTURE_PRIVATE_BODY" not in result.stdout
+    assert "999999" not in result.stdout
+    assert "Traceback" not in result.stdout
+    assert "Stored Alerts" not in result.stdout
+    if command == "list":
+        assert valid.name in result.stdout
+        assert "valid (legacy)" in result.stdout
+    assert invalid.read_bytes() == payload
+
+
+@pytest.mark.parametrize("command", ["list", "show"])
+def test_reports_cli_incompatible_evidence_errors_hide_private_keys(
+    command: str,
+    tmp_path: Path,
+) -> None:
+    path = write_review_report(
+        tmp_path,
+        filename="private.json",
+        alerts=[review_alert(evidence={"DO_NOT_RENDER_PRIVATE_KEY": "\ud800"})],
+    )
+    arguments = (
+        ["reports", "show", str(path)]
+        if command == "show"
+        else ["reports", "list", "--report-dir", str(tmp_path)]
+    )
+    result = runner.invoke(app, arguments, terminal_width=180)
+    assert result.exit_code == 1
+    assert "Incompatible report" in result.stdout
+    assert "DO_NOT_RENDER_PRIVATE_KEY" not in result.stdout
+    assert "Traceback" not in result.stdout
+
+
+@pytest.mark.parametrize("command", ["list", "show"])
+@pytest.mark.parametrize("depth", [30, sys.getrecursionlimit() + 100])
+def test_reports_cli_handles_deep_input_cleanly(
+    depth: int,
+    command: str,
+    tmp_path: Path,
+) -> None:
+    path = write_review_report(tmp_path, alerts=[review_alert(evidence={"nested": "TOKEN"})])
+    source = path.read_text(encoding="utf-8")
+    path.write_text(source.replace('"TOKEN"', "[" * depth + "null" + "]" * depth), encoding="utf-8")
+    classification = None
+    if depth > 30:
+        # Decoder and Python validation capacities differ across Python versions.
+        with pytest.raises(ReportSchemaError, match="recursion capacity") as canonical:
+            parse_report_json(path.read_bytes())
+        classification = (
+            "Malformed JSON"
+            if canonical.value.outcome is ReportValidationOutcome.MALFORMED
+            else "Incompatible report"
+        )
+    arguments = (
+        ["reports", "show", str(path)]
+        if command == "show"
+        else ["reports", "list", "--report-dir", str(tmp_path)]
+    )
+    result = runner.invoke(app, arguments, terminal_width=180)
+    assert result.exit_code == (1 if classification else 0)
+    assert "Traceback" not in result.stdout
+    if classification:
+        assert classification in result.stdout
+        assert "Stored Alerts" not in result.stdout
+
+
+def test_reports_list_deterministic_order_across_versions_and_invalid_files(tmp_path: Path) -> None:
+    for filename, timestamp in (
+        ("z-older.json", "2026-08-27T12:00:00+00:00"),
+        ("b-newest.json", "2026-08-28T12:00:00+00:00"),
+        ("a-newest.json", "2026-08-28T12:00:00+00:00"),
+    ):
+        path = write_review_report(tmp_path, filename=filename, generated_at=timestamp)
+        if filename == "b-newest.json":
+            data = json.loads(path.read_bytes())
+            data["schema_version"] = 1
+            path.write_text(json.dumps(data), encoding="utf-8")
+    (tmp_path / "a-bad.json").write_bytes(b"not JSON")
+    (tmp_path / "z-future.json").write_bytes(
+        (REPORT_FIXTURES / "unsupported_schema_version.json").read_bytes()
+    )
+    result = runner.invoke(
+        app, ["reports", "list", "--report-dir", str(tmp_path)], terminal_width=180
+    )
+    assert result.exit_code == 1
+    expected = ["a-newest.json", "b-newest.json", "z-older.json", "a-bad.json", "z-future.json"]
+    assert [result.stdout.index(name) for name in expected] == sorted(
+        result.stdout.index(name) for name in expected
+    )
+    assert "valid (v1)" in result.stdout
+    assert "valid (legacy)" in result.stdout
+    assert "unsupported" in result.stdout
+
+
+@pytest.mark.parametrize("command", ["list", "show"])
+@pytest.mark.parametrize("boundary", ["parser", "validation"])
+def test_reports_cli_classifies_recursion_boundaries_without_private_details(
+    command: str,
+    boundary: str,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    path = write_review_report(tmp_path)
+
+    def fail(*args, **kwargs):
+        raise RecursionError("PRIVATE_RECURSION_DETAIL")
+
+    target = (
+        "sentinellite.reporting.validation.json.loads"
+        if boundary == "parser"
+        else "sentinellite.reporting.validation._copy_json_value"
+    )
+    monkeypatch.setattr(target, fail)
+    arguments = (
+        ["reports", "show", str(path)]
+        if command == "show"
+        else ["reports", "list", "--report-dir", str(tmp_path)]
+    )
+    result = runner.invoke(app, arguments, terminal_width=180)
+    assert result.exit_code == 1
+    assert ("Malformed JSON" if boundary == "parser" else "Incompatible report") in result.stdout
+    assert "PRIVATE_RECURSION_DETAIL" not in result.stdout
+    assert "Traceback" not in result.stdout
+
+
+@pytest.mark.parametrize(
+    "filename", ["schema_v1_explanation.json", "legacy_unversioned_explanation.json"]
+)
+@pytest.mark.parametrize("command", ["list", "show"])
+def test_reports_cli_versioned_summaries_hide_private_evidence_and_explanations(
+    filename: str,
+    command: str,
+    tmp_path: Path,
+) -> None:
+    data = json.loads((REPORT_FIXTURES / filename).read_bytes())
+    data["alerts"][0]["evidence"] = {"PRIVATE_EVIDENCE": "PRIVATE_VALUE"}
+    data["alerts"][0]["explanation"]["summary"] = "PRIVATE_EXPLANATION_BODY"
+    data["alerts"][0]["explanation"]["evidence_summary"] = {"PRIVATE_SUMMARY": "PRIVATE_VALUE"}
+    path = tmp_path / "private.json"
+    original = json.dumps(data).encode()
+    path.write_bytes(original)
+    arguments = (
+        ["reports", "show", str(path)]
+        if command == "show"
+        else ["reports", "list", "--report-dir", str(tmp_path)]
+    )
+    result = runner.invoke(app, arguments, terminal_width=180)
+    assert result.exit_code == 0
+    for private in (
+        "PRIVATE_EVIDENCE",
+        "PRIVATE_VALUE",
+        "PRIVATE_EXPLANATION_BODY",
+        "PRIVATE_SUMMARY",
+    ):
+        assert private not in result.stdout
+    if command == "show":
+        assert "yes" in result.stdout
+        assert "Stored explanation count" in result.stdout
+    assert path.read_bytes() == original
+
+
+def test_reports_show_retains_syntax_location_for_long_paths(tmp_path: Path) -> None:
+    directory = tmp_path / ("long-report-directory-" * 7)
+    directory.mkdir()
+    path = directory / "malformed.json"
+    original = b'{"secret":"DO_NOT_RENDER"'
+    path.write_bytes(original)
+    result = runner.invoke(app, ["reports", "show", str(path)], terminal_width=80)
+    assert result.exit_code == 1
+    assert "Malformed JSON" in result.stdout
+    assert "line 1" in result.stdout
+    assert "column" in result.stdout
+    assert "DO_NOT_RENDER" not in result.stdout
+    assert "Traceback" not in result.stdout
+    assert path.read_bytes() == original

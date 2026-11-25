@@ -27,6 +27,7 @@ EXPECTED_COMMANDS = {
     "scan-process",
 }
 REPORT_KEYS = {
+    "schema_version",
     "report_id",
     "report_type",
     "generated_at",
@@ -205,6 +206,8 @@ def test_installed_console_fixture_scan_preserves_separate_schemas(
     report = json.loads(source_bytes)
     notification = json.loads(notification_path.read_text(encoding="utf-8"))
     assert set(report) == REPORT_KEYS
+    assert type(report["schema_version"]) is int
+    assert report["schema_version"] == 1
     assert report["report_type"] == "sentinellite_alert_report"
     assert "explanations" not in report
     assert set(notification) == NOTIFICATION_KEYS
@@ -231,6 +234,8 @@ def test_onboarding_entry_points_work_outside_checkout(
     report_path, = (tmp_path / "reports").glob("*.json")
     report = json.loads(report_path.read_text(encoding="utf-8"))
     assert set(report) == REPORT_KEYS
+    assert type(report["schema_version"]) is int
+    assert report["schema_version"] == 1
     assert report["alert_count"] == 3
 
     reviewed = run_entry_point(command, "reports", "show", str(report_path), cwd=tmp_path)

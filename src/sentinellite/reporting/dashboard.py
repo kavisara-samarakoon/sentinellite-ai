@@ -1,7 +1,6 @@
 """Export a standalone, offline HTML view of stored local reports."""
 
 import html
-import json
 import math
 import os
 import stat
@@ -14,10 +13,10 @@ from tempfile import NamedTemporaryFile
 
 from sentinellite.reporting.review import (
     MAX_REPORT_SIZE_BYTES,
-    SUPPORTED_REPORT_TYPE,
     ReportReviewError,
     discover_report_paths,
 )
+from sentinellite.reporting.validation import parse_report_json
 
 SAFETY_BANNER = (
     "Local static report viewer. No live monitoring, no network activity, no automatic remediation."
@@ -77,7 +76,7 @@ def _timestamp(value: object) -> datetime | None:
     if not isinstance(value, str):
         return None
     try:
-        parsed = datetime.fromisoformat(value)
+        parsed = datetime.fromisoformat(value.replace("z", "Z"))
         # Existing reports include an offset. An ambiguous or invalid time is unavailable.
         return parsed.astimezone(UTC) if parsed.tzinfo is not None else None
     except (ValueError, OverflowError):
@@ -130,16 +129,11 @@ def _load_report(path: Path, limit: int) -> DashboardReport:
         encoded = report_file.read(MAX_REPORT_SIZE_BYTES + 1)
     if len(encoded) > MAX_REPORT_SIZE_BYTES:
         raise ValueError("Report exceeds the report size limit.")
-    data = json.loads(encoded.decode("utf-8"))
-    if not isinstance(data, dict) or data.get("report_type") != SUPPORTED_REPORT_TYPE:
-        raise ValueError("Unsupported report type.")
-    alerts = data.get("alerts")
-    if not isinstance(alerts, list) or any(not isinstance(item, dict) for item in alerts):
-        raise ValueError("Report alerts must be an array of objects.")
-    count = data.get("alert_count", len(alerts))
-    if type(count) is not int or count != len(alerts):
-        raise ValueError("Report alert count does not match its alerts.")
-    generated_at = _timestamp(data.get("generated_at"))
+    # Validate the complete source before selecting any dashboard summary fields.
+    data = parse_report_json(encoded).to_dict()
+    alerts = data["alerts"]
+    count = data["alert_count"]
+    generated_at = _timestamp(data["generated_at"])
     selected = nlargest(
         limit,
         (_alert(item, generated_at) for item in alerts),
