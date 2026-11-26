@@ -11,18 +11,17 @@ or perform automatic remediation.
 
 ## Status
 
-The current version is `v1.2.0-beta`, the current published
-[GitHub pre-release](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.2.0-beta)
-for the local static dashboard and ARM-SecNet lab validation milestone. See the
-[release notes](docs/release-notes-v1.2.0-beta.md) for publication details and final asset hashes,
-and [release history](#release-history) for earlier milestones.
-SentinelLite AI is beta-stage software, not a production EDR, and is not published to PyPI.
+The current release candidate in preparation is `v1.3.0-beta` (package version `1.3.0b0`),
+which introduces the versioned alert-report schema v1 and compatibility validation for Issue #14
+(merged in PR #15). See the [v1.3.0-beta release notes](docs/release-notes-v1.3.0-beta.md) for
+candidate scope, validation status, and pending publication details. `v1.3.0-beta` is not yet
+published.
 
-Unreleased `v1.3.0-beta` development for Issue #14 is on
-`feature/v1.3-report-schema-v1`. The report-contract descriptions below apply to that
-source branch: new reports use schema v1, and complete historical unversioned reports
-remain readable. Published `v1.2.0-beta` artifacts retain their historical report format.
-Package and CLI version metadata still display `v1.2.0-beta`; no new release is claimed.
+The currently published [GitHub pre-release](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.2.0-beta)
+is `v1.2.0-beta` (see the [v1.2.0-beta release notes](docs/release-notes-v1.2.0-beta.md) for
+publication details and final asset hashes, and [release history](#release-history) for earlier
+milestones). Published `v1.2.0-beta` artifacts retain their historical unversioned report format.
+SentinelLite AI is beta-stage software, not a production EDR, and is not published to PyPI.
 
 The automated suite covers configuration, collectors,
 normalization, detection, scoring, reporting, deterministic explanations, local report
@@ -133,7 +132,8 @@ No `PYTHONPATH` setting is required after installation.
 
 ## Quick Start
 
-With `v1.2.0-beta` installed, check the local installation,
+With SentinelLite AI installed (for example, from source or the published `v1.2.0-beta` wheel),
+check the local installation,
 generate a synthetic report, and export a static dashboard from a writable working directory:
 
 ```bash
@@ -197,7 +197,7 @@ The projects remain separate repositories with no runtime dependency between the
 
 ### Local Static Dashboard
 
-The static dashboard exporter is included in the published `v1.2.0-beta` release. Run:
+The static dashboard exporter is included in `v1.3.0-beta` and the published `v1.2.0-beta` release. Run:
 
 ```bash
 sentinellite dashboard export --reports-dir reports --output reports/dashboard.html --limit 25
@@ -422,8 +422,10 @@ Ubuntu ARM64 results and their limitations are recorded in the
 
 ## Release History
 
-The [v1.2.0-beta release notes](docs/release-notes-v1.2.0-beta.md) describe the current
-published GitHub pre-release.
+- [v1.3.0-beta](docs/release-notes-v1.3.0-beta.md) — Current release candidate in preparation
+  (pending validation and publication)
+- [v1.2.0-beta](docs/release-notes-v1.2.0-beta.md) — Current published
+  [GitHub pre-release](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.2.0-beta)
 
 Historical milestone notes remain available for reference:
 

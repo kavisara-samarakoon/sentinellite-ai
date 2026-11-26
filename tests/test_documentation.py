@@ -16,6 +16,7 @@ CURRENT_DOCUMENTS = (
     PROJECT_ROOT / "docs/release-checklist.md",
     PROJECT_ROOT / "docs/release-notes-v1.1.0-beta.md",
     PROJECT_ROOT / "docs/release-notes-v1.2.0-beta.md",
+    PROJECT_ROOT / "docs/release-notes-v1.3.0-beta.md",
     PROJECT_ROOT / "docs/integrations/arm-secnet.md",
     PROJECT_ROOT / "tests/fixtures/report_schema/README.md",
 )
@@ -42,18 +43,17 @@ def test_readme_exposes_current_install_and_release_documents() -> None:
     assert "docs/data-contracts.md" in readme
     assert "docs/release-checklist.md" in readme
     assert "production EDR" in readme
-    assert "The current version is `v1.2.0-beta`" in readme
+    assert "The current release candidate in preparation is `v1.3.0-beta`" in readme
+    assert "docs/release-notes-v1.3.0-beta.md" in readme
+    assert "`v1.3.0-beta` is not yet\npublished." in readme
     assert "docs/release-notes-v1.2.0-beta.md" in readme
-    assert "current published\n[GitHub pre-release]" in readme
+    assert "currently published [GitHub pre-release]" in readme
     assert "releases/tag/v1.2.0-beta" in readme
-    assert "release candidate" not in readme.lower()
-    assert "pending" not in readme.lower()
+    assert "feature/v1.3-report-schema-v1" not in readme
     assert "releases/tag/v1.1.0-beta" in readme
     assert "previous published release was\n[v1.1.0-beta]" in readme
     assert "current published milestone is `v0.9.0-alpha`" not in readme.lower()
-    assert "Unreleased `v1.3.0-beta` development for Issue #14" in readme
-    assert "Published `v1.2.0-beta` artifacts retain their historical report format" in readme
-    assert "Package and CLI version metadata still display `v1.2.0-beta`" in readme
+    assert "Published `v1.2.0-beta` artifacts retain their historical unversioned report format" in readme
 
 
 def test_beta_release_notes_are_published_and_safety_scoped() -> None:
@@ -81,6 +81,31 @@ def test_beta_release_notes_are_published_and_safety_scoped() -> None:
     assert "no daemon, scheduler, background service" in normalized_notes
     assert "no active network scanning" in normalized_notes
     assert "no automatic remediation" in normalized_notes
+
+
+def test_v1_3_release_candidate_notes_are_scoped_and_pending() -> None:
+    release_notes = (
+        PROJECT_ROOT / "docs/release-notes-v1.3.0-beta.md"
+    ).read_text(encoding="utf-8")
+    normalized_notes = " ".join(release_notes.lower().split())
+
+    assert "release candidate" in normalized_notes
+    assert "not yet published" in normalized_notes
+    assert "pending" in normalized_notes
+    assert "1.3.0-beta" in release_notes
+    assert "1.3.0b0" in release_notes
+    assert "schema_version" in release_notes
+    assert "legacy-unversioned" in release_notes
+    assert "parse_report_json()" in release_notes
+    assert "historical-format replicas" in normalized_notes
+    assert "do not claim universal linux or arm64 compatibility" in normalized_notes
+    assert "not a production edr release" in normalized_notes
+    assert "no real ai or llm execution" in normalized_notes
+    assert "no external notification delivery" in normalized_notes
+    assert "no daemon, scheduler, background service" in normalized_notes
+    assert "no active network scanning" in normalized_notes
+    assert "no automatic remediation" in normalized_notes
+    assert "feature/v1.3-report-schema-v1" not in release_notes
 
 
 def test_data_contract_documentation_covers_v1_legacy_and_consumer_outcomes() -> None:

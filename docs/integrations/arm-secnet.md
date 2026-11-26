@@ -82,8 +82,9 @@ sentinellite --version
 
 Keep this checkout separate from ARM-SecNet. The editable installation uses this
 SentinelLite checkout; it does not install or import ARM-SecNet as a dependency. Keep the
-virtual environment active for subsequent commands. The expected version output is
-`SentinelLite AI v1.2.0-beta`.
+virtual environment active for subsequent commands. On the `v1.3.0-beta` release candidate,
+the expected version output is `SentinelLite AI v1.3.0-beta` (package version `1.3.0b0`);
+the published `v1.2.0-beta` release outputs `SentinelLite AI v1.2.0-beta`.
 
 ## Install from a GitHub Release Wheel
 

@@ -3,7 +3,7 @@
 ## Purpose
 
 This is the deterministic golden path for the SentinelLite AI source CLI, including
-the schema-v1 report work for unreleased `v1.3.0-beta` on `feature/v1.3-report-schema-v1`.
+the schema-v1 report contract for the `v1.3.0-beta` release candidate (Issue #14, PR #15).
 It uses bundled, non-sensitive authentication fixtures and isolated
 temporary output. It does not require elevated privileges, read real authentication-log
 contents, or rely on environment-dependent alert results.
@@ -103,8 +103,8 @@ sentinellite --help
 Both version commands must print the same version. The help output should describe a local
 defensive observation and report-review CLI, not a resident agent or service.
 
-The published release and this development branch currently both print
-`SentinelLite AI v1.2.0-beta`; version metadata has not yet been changed for release.
+The `v1.3.0-beta` release candidate prints `SentinelLite AI v1.3.0-beta` (package version
+`1.3.0b0`), whereas the published `v1.2.0-beta` wheel prints `SentinelLite AI v1.2.0-beta`.
 
 ## 3. Show Local Status
 
@@ -178,7 +178,7 @@ Because `report_dir` was fresh and the fixture scan writes one report, this reso
 path. `reports show` does not print alert evidence or raw JSON by default and does not
 regenerate stored explanations.
 
-On the schema-v1 development branch, `reports list` labels new reports `valid (v1)` and
+With schema v1 (`v1.3.0-beta`), `reports list` labels new reports `valid (v1)` and
 complete historical reports `valid (legacy)`. `reports show` displays `schema-v1` with
 version `1`, or `legacy-unversioned` with version `unversioned`. Legacy files are not
 rewritten or given a version. Malformed and incompatible reports are `invalid`; future
