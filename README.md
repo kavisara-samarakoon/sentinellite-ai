@@ -400,9 +400,10 @@ git diff --check
 ```
 
 Release preparation must follow the [release checklist](docs/release-checklist.md).
-See the [Linux validation notes](docs/linux-validation.md) for historical Ubuntu ARM64 results
-and the [v1.3.0-beta validation record](docs/release-notes-v1.3.0-beta.md#release-validation)
-for the current release.
+See the [Linux validation notes](docs/linux-validation.md) for historical Ubuntu ARM64 results,
+the [v1.3.0-beta validation record](docs/release-notes-v1.3.0-beta.md#release-validation)
+for the current release, and the [cloud VM validation guide](docs/cloud/vm-validation.md) for
+planned Ubuntu cloud workload checks.
 
 ## Current Limitations
 
