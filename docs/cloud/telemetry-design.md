@@ -2,8 +2,15 @@
 
 This document defines the offline telemetry export contract, component reuse assessment,
 resource limits, provenance rules, and proposed future Azure ingestion architecture for
-SentinelLite AI. This is a **design specification**; no production telemetry integration,
-CLI command, or Azure ingestion code is implemented in SentinelLite AI at this checkpoint.
+SentinelLite AI.
+
+- **Implemented locally (SENT-C2-P03):** `src/sentinellite/reporting/telemetry.py`,
+  `src/sentinellite/reporting/telemetry_io.py`, and
+  `sentinellite reports export-telemetry REPORT_PATH --output OUTPUT_PATH`.
+- **Retained design evidence:** `experiments/sent_c2/` (isolated prototype, not imported by
+  or packaged into `sentinellite`).
+- **Not implemented:** Azure ingestion, HTTP clients, credentials, and the Stage 4 optional
+  separate Azure companion/adapter remain future plans only.
 
 ## 1. Existing Component Reuse Assessment
 
@@ -90,17 +97,19 @@ All limits fail closed rather than silently truncating:
 | --- | --- | --- |
 | Reports per export | `1` | One explicitly selected file path; no directory discovery. |
 | Input file size | `2 MiB` (`2,097,152` bytes) | `<= 2,097,152` accepted; `> 2,097,152` rejected (`limit-exceeded`). |
+| JSON container nesting depth | `64` | Root container counts as depth `1`; `<= 64` accepted; `> 64` rejected (`limit-exceeded`). |
 | Input alerts | `1,000` alerts | `<= 1,000` accepted; `> 1,000` rejected (`limit-exceeded`). |
 | Aggregation groups | `128` groups | `<= 128` accepted; `> 128` rejected (`limit-exceeded`). |
-| Serialized output | `64 KiB` (`65,536` bytes) | UTF-8 encoded bytes `<= 65,536` accepted; `> 65,536` rejected (`limit-exceeded`). |
+| Serialized output & saved telemetry | `64 KiB` (`65,536` bytes) | UTF-8 encoded bytes `<= 65,536` accepted; `> 65,536` rejected (`limit-exceeded`). |
 
 Notes and residual assumptions:
 - A `2 MiB` input cap does **not** guarantee a `2 MiB` peak memory limit during Python JSON
   decoding.
-- **Bounded nesting policy:** Without duplicating `parse_report_json()`, telemetry bounds
-  input size (`2 MiB`) and catches `RecursionError` as sanitized `incompatible` (for saved
-  telemetry parsing, `parse_telemetry_json()` also enforces `64 KiB` max input, strict
-  UTF-8, duplicate-key rejection, and nonfinite-number rejection).
+- **Bounded nesting policy:** Without duplicating `parse_report_json()`, telemetry runs a
+  lightweight string-aware preflight container depth scanner (`MAX_JSON_NESTING_DEPTH = 64`)
+  on bounded (`<= 2 MiB` source or `<= 64 KiB` saved telemetry) UTF-8 text before calling
+  `parse_report_json()` or `json.loads()`, and catches `RecursionError` as sanitized
+  `incompatible`.
 - Under the closed 17-rule contract and `128`-group cap, the largest feasible valid
   telemetry payload is ~13 KiB, so `64 KiB` is unreachable without reducing the test limit.
 
@@ -108,22 +117,32 @@ Notes and residual assumptions:
 
 - **Source preservation:** Input reports are opened read-only and remain byte-for-byte
   unchanged; source reports are never automatically deleted.
-- **Input reader requirements (future production implementation):**
-  - Open with `O_RDONLY | O_NONBLOCK | O_NOFOLLOW` where supported (preventing FIFO-open
-    hangs and symlink following), failing closed if required safety primitives are
-    unsupported rather than silently weakening guarantees.
-  - Verify `S_ISREG` and size via `os.fstat()` on the open descriptor, then read at most
-    `MAX_INPUT_BYTES + 1` bytes.
-  - Require an explicit trusted/private parent directory; document that parent-directory
-    symlinks and concurrent external file modifications remain residual OS-level risks.
-- **Output writer requirements (future production implementation):**
-  - Explicit output destination inside a trusted private directory (`0o600`), no overwrite,
-    no implicit directory discovery, and no symlink or special-file writes.
-  - Distinguish exclusive creation (`O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW`) from atomic
-    publication (write to a private temp file in the same trusted directory, `fsync`, and
-    publish via no-clobber link/rename); remove temp/partial files on failure.
-  - Document crash-related residual risks and note that inode comparison alone does not
-    eliminate all filesystem races.
+- **Input reader requirements (implemented in `telemetry_io.py`):**
+  - Open with `O_RDONLY | O_NONBLOCK | O_NOFOLLOW` via a pinned `0700` owner-owned directory
+    descriptor (preventing FIFO-open hangs and final-component symlink following), failing
+    closed on unsupported required safety primitives or `NotImplementedError` rather than
+    silently weakening guarantees.
+  - Verify `S_ISREG`, effective-user ownership, private source permissions (`mode & 0o077 == 0`,
+    preferring `0600`), and size via `os.fstat()` before and after bounded reading of at most
+    `MAX_INPUT_BYTES + 1` bytes (post-read consistency checks cover device, inode, ownership,
+    mode, size, mtime, and ctime). Existing source reports are never `chmod`ed or rewritten,
+    and there is no public `max_bytes` bypass exceeding `MAX_INPUT_BYTES`.
+  - POSIX mode checks assume trusted ancestor directories, trusted ACL configurations, and
+    trusted filesystems; they do not universally prove absence of alternative access grants
+    (for example, POSIX ACLs) or protect against arbitrary equivalent-privilege processes.
+- **Output writer requirements (implemented in `telemetry_io.py`):**
+  - `write_telemetry_file()` strictly validates and canonically serializes the payload
+    before any filesystem mutation, refusing invalid payloads before creating a destination
+    or temporary file.
+  - Explicit output destination inside a pinned `0700` owner-owned private directory;
+    rejects pre-existing destinations before temporary creation.
+  - Creates a `0600` same-directory temporary file with `O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW`,
+    writes complete bytes, `fsync`s the file, publishes via atomic no-clobber `os.link`
+    using directory descriptors, unlinks the temporary name, and `fsync`s the directory.
+  - Pre-publication failures unlink the temporary file and preserve `published=False`
+    (explicitly reporting possible private temporary-file residue if cleanup also fails);
+    post-publication cleanup or directory-fsync failures report `published=True` and never
+    delete the published file. Crash windows can leave private temporary-file residue.
 - **Saved telemetry parser & export identity:**
   - `parse_telemetry_json()` validates saved telemetry UTF-8 bytes (`<= 64 KiB`), rejects
     duplicate keys before dict validation, rejects nonfinite numbers, and preserves `export_id`.

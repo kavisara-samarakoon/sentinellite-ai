@@ -318,5 +318,16 @@ def test_telemetry_design_docs_define_contract_limits_and_azure_boundaries() -> 
     assert "O_NONBLOCK" in design
     assert "parse_telemetry_json()" in design
     assert "from None" in design
+    assert "64" in design
+    assert "export-telemetry" in design
     assert "Default `--dry-run`" in plan
     assert "FIFO" in plan
+    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    contracts = (PROJECT_ROOT / "docs/data-contracts.md").read_text(encoding="utf-8")
+    security = (PROJECT_ROOT / "SECURITY.md").read_text(encoding="utf-8")
+    assert "sentinellite reports export-telemetry" in readme
+    assert "umask 077" in readme
+    assert "Offline Telemetry Contract" in contracts
+    assert "write_telemetry_file()" in contracts
+    assert "offline telemetry exports" in security.lower()
+    assert "minimization is not anonymization" in " ".join(security.lower().split())

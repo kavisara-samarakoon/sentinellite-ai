@@ -47,6 +47,15 @@ from sentinellite.reporting.review import (
     load_review_report,
 )
 from sentinellite.reporting.schema import ReportContract, ReportValidationOutcome
+from sentinellite.reporting.telemetry import (
+    TelemetryError,
+    TelemetryOutputError,
+    project_telemetry_from_bytes,
+)
+from sentinellite.reporting.telemetry_io import (
+    read_bounded_report_bytes,
+    write_telemetry_file,
+)
 
 console = Console()
 CURRENT_VERSION = __version__
@@ -720,6 +729,59 @@ def reports_export_notification_command(
         "Omitted alerts",
         _literal_text(summary.omitted_alert_count),
     )
+    console.print(result_table)
+    console.print(
+        _literal_text(f"Output path: {written_path}"),
+        soft_wrap=True,
+    )
+
+
+@reports_app.command("export-telemetry")
+def reports_export_telemetry_command(
+    report_path: Path,
+    output: Annotated[
+        Path,
+        typer.Option(
+            "--output",
+            help="Exact path for the local offline telemetry JSON file.",
+        ),
+    ],
+) -> None:
+    """Export privacy-minimized offline telemetry JSON from one private alert report."""
+    try:
+        if output == report_path:
+            raise TelemetryOutputError(
+                "Telemetry output path must differ from the source report path."
+            )
+
+        source_bytes = read_bounded_report_bytes(report_path)
+        telemetry = project_telemetry_from_bytes(source_bytes)
+        written_path = write_telemetry_file(output, telemetry)
+    except TelemetryError as error:
+        console.print(
+            _literal_text(
+                f"[!] Telemetry export error ({error.outcome.value}): {error}",
+                max_length=240,
+                style="red",
+            )
+        )
+        raise typer.Exit(code=1) from None
+
+    console.print(
+        _literal_text(
+            "[+] Offline telemetry exported successfully.",
+            style="green",
+        )
+    )
+    result_table = Table(title="Local Offline Telemetry Export")
+    result_table.add_column("Field", style="bold")
+    result_table.add_column("Value")
+    result_table.add_row("Schema version", _literal_text(telemetry.schema_version))
+    result_table.add_row("Output type", _literal_text(telemetry.output_type))
+    result_table.add_row("Export ID", _literal_text(telemetry.export_id))
+    result_table.add_row("Exported at", _literal_text(telemetry.exported_at))
+    result_table.add_row("Total alerts", _literal_text(telemetry.alert_count))
+    result_table.add_row("Group count", _literal_text(len(telemetry.groups)))
     console.print(result_table)
     console.print(
         _literal_text(f"Output path: {written_path}"),

@@ -140,7 +140,13 @@ def test_ci_quality_gates_and_embedded_python_remain_intact() -> None:
     steps = {step["name"]: step for step in job["steps"]}
     assert steps["Check installed dependencies"]["run"] == "python -m pip check"
     assert steps["Run Ruff"]["run"] == "ruff check --no-cache src tests"
-    assert steps["Run Pytest"]["run"] == "PYTHONDONTWRITEBYTECODE=1 pytest -p no:cacheprovider"
+    assert steps["Run Pytest"]["run"] == (
+        "PYTHONDONTWRITEBYTECODE=1 python -m pytest -q -p no:cacheprovider tests/"
+    )
+    assert steps["Run retained isolated design prototype tests"]["run"] == (
+        "PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 python -m pytest -q -p no:cacheprovider "
+        "experiments/sent_c2/test_telemetry_prototype.py"
+    )
     assert steps["Build wheel"]["run"] == "python -m build --wheel"
     assert {
         "Validate wheel contents and metadata",

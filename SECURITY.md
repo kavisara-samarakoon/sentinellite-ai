@@ -23,6 +23,7 @@ command:
 - apply transparent local detection and risk-scoring rules
 - write and review local JSON alert reports
 - export a separate privacy-minimized notification summary to a local file
+- export a separate privacy-minimized offline telemetry JSON file from one private report
 - display deterministic investigation guidance derived from local templates
 
 The explanation templates are deterministic and rule-based. They are not real AI or LLM
@@ -63,13 +64,16 @@ Do not commit:
 - API keys, passwords, tokens, private keys, or `.env` files
 - real user or authentication logs
 - personal data or VM credentials
-- generated alert reports, notification summaries, or file integrity baselines
+- generated alert reports, notification summaries, offline telemetry exports, or file integrity baselines
 - host-specific process, network, file, or security evidence
 
 Alert reports can contain detailed operational evidence. Notification summaries omit alert
 messages, evidence, explanation text, and common sensitive detail fields, but still expose
-report timing, matched rule IDs, categories, severity, and risk information. Treat both
-artifact types as sensitive.
+report timing, matched rule IDs, categories, severity, and risk information. Offline telemetry
+exports further omit report IDs, source timestamps, categories, and risk scores, aggregating
+counts by allowlisted rule ID, severity, and risk level only; however, minimization is not
+anonymization and telemetry still discloses operational context. Treat all three artifact
+types as sensitive.
 
 ## Reporting a Vulnerability
 

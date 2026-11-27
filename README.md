@@ -289,6 +289,7 @@ sentinellite scan-files-baseline --baseline-path PATH
 sentinellite reports list [--report-dir PATH]
 sentinellite reports show REPORT_PATH
 sentinellite reports export-notification REPORT_PATH --output OUTPUT_PATH
+sentinellite reports export-telemetry REPORT_PATH --output OUTPUT_PATH
 ```
 
 Alert-producing scan commands accept `--output-dir` and
@@ -372,6 +373,34 @@ and do not regenerate explanations or recalculate risk scores.
 Notification export uses stored report data, refuses to overwrite an existing output,
 does not modify the source report, and performs no delivery. Although privacy-minimized,
 the resulting summary still contains operational security metadata and remains sensitive.
+
+### Local Offline Telemetry Export
+
+Export a privacy-minimized, aggregated telemetry JSON file from one private report:
+
+```bash
+(
+  umask 077
+  priv_dir="$(mktemp -d /tmp/sentinellite-telemetry.XXXXXX)"
+  cp -n reports/alerts-example.json "$priv_dir/source-report.json"
+  chmod 0600 "$priv_dir/source-report.json"
+  sentinellite reports export-telemetry "$priv_dir/source-report.json" \
+    --output "$priv_dir/telemetry.json"
+)
+```
+
+Offline telemetry export requires an existing owner-owned `0700` parent directory for both
+the source file and output path, and an owner-only (`0600`, no group/other bits) regular
+source report. The writer strictly validates and canonically serializes the payload before
+touching the filesystem, assumes trusted ancestor directories and POSIX ACL configurations,
+fails closed on unsupported filesystem safety primitives, reports any pre-publication cleanup
+failure explicitly (`published=False`), preserves the source report byte-for-byte, and
+publishes atomically (`0600`) without overwriting existing destinations. Production tests
+(`tests/`) and retained prototype tests (`experiments/sent_c2/test_telemetry_prototype.py`)
+are collected separately. It performs no network requests, credential acquisition, or Azure
+ingestion. Minimization is not anonymization, structural validation is not authenticity,
+and exactly-once delivery is not guaranteed. See [Telemetry Design](docs/cloud/telemetry-design.md)
+for local vs future Azure scope.
 
 The exact contracts and compatibility expectations are documented in
 [Data Contracts](docs/data-contracts.md).

@@ -44,7 +44,13 @@ jobs:
         run: ruff check --no-cache src tests
 
       - name: Run Pytest
-        run: PYTHONDONTWRITEBYTECODE=1 pytest -p no:cacheprovider
+        run: PYTHONDONTWRITEBYTECODE=1 python -m pytest -q -p no:cacheprovider tests/
+
+      - name: Run Ruff on retained design prototype
+        run: ruff check --no-cache experiments/sent_c2
+
+      - name: Run retained isolated design prototype tests
+        run: PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 python -m pytest -q -p no:cacheprovider experiments/sent_c2/test_telemetry_prototype.py
 
       - name: Validate schema-v1 and historical report compatibility
         run: |
@@ -99,6 +105,9 @@ jobs:
                   for name in names
               )
               assert "sentinellite/config/default.yaml" in names
+              assert "sentinellite/reporting/telemetry.py" in names
+              assert "sentinellite/reporting/telemetry_io.py" in names
+              assert not any(name.startswith("experiments/") for name in names)
               metadata_names = sorted(
                   name for name in names if name.endswith(".dist-info/METADATA")
               )
@@ -139,10 +148,67 @@ jobs:
           python -m venv "$wheel_environment"
           "$wheel_environment/bin/python" -m pip install "$wheel_path"
 
+          unset PYTHONPATH PYTHONHOME
           cd /tmp
           test "$("$wheel_environment/bin/sentinellite" --version)" = "$expected_version"
           test "$("$wheel_environment/bin/python" -m sentinellite --version)" = "$expected_version"
           "$wheel_environment/bin/sentinellite"
+          "$wheel_environment/bin/sentinellite" reports export-telemetry --help >/dev/null
+
+          telemetry_root="$(mktemp -d /tmp/sentinellite-ci-telemetry.XXXXXX)"
+          chmod 0700 "$telemetry_root"
+          "$wheel_environment/bin/python" - "$GITHUB_WORKSPACE" "$telemetry_root" <<'PY'
+          import os, shutil, stat, subprocess, sys
+          from pathlib import Path
+
+          repo = Path(sys.argv[1])
+          root = Path(sys.argv[2])
+          cli = Path(sys.executable).with_name("sentinellite")
+
+          for name, fixture in (
+              ("v1", repo / "tests/fixtures/report_schema/schema_v1_alert.json"),
+              ("legacy", repo / "tests/fixtures/report_schema/legacy_unversioned_alert.json"),
+          ):
+              src = root / f"{name}.json"
+              shutil.copyfile(fixture, src)
+              os.chmod(src, 0o600)
+              before = src.read_bytes()
+              out = root / f"{name}-telemetry.json"
+              res = subprocess.run(
+                  [str(cli), "reports", "export-telemetry", str(src), "--output", str(out)],
+                  cwd=root,
+                  capture_output=True,
+                  text=True,
+                  check=False,
+              )
+              assert res.returncode == 0, res.stdout + res.stderr
+              assert src.read_bytes() == before
+              assert stat.S_IMODE(out.stat().st_mode) == 0o600
+              out_before = out.read_bytes()
+              dup = subprocess.run(
+                  [str(cli), "reports", "export-telemetry", str(src), "--output", str(out)],
+                  cwd=root,
+                  capture_output=True,
+                  text=True,
+                  check=False,
+              )
+              assert dup.returncode != 0
+              assert out.read_bytes() == out_before
+          PY
+
+          "$wheel_environment/bin/python" - "$telemetry_root" <<'PY'
+          import sys
+          from pathlib import Path
+          from sentinellite.reporting.telemetry import parse_telemetry_json
+
+          root = Path(sys.argv[1])
+          for name in ("v1", "legacy"):
+              parsed = parse_telemetry_json((root / f"{name}-telemetry.json").read_bytes())
+              assert parsed.schema_version == 1
+              assert parsed.output_type == "sentinellite_telemetry"
+              assert parsed.alert_count >= 1
+          PY
+          rm -rf "$telemetry_root"
 
       - name: Validate installed entry points
         run: |
