@@ -2,8 +2,8 @@
 
 ## Purpose
 
-This is the deterministic golden path for the SentinelLite AI source CLI, including
-the schema-v1 report contract for the `v1.3.0-beta` release candidate (Issue #14, PR #15).
+This guide demonstrates the published SentinelLite AI `v1.3.0-beta` CLI and its schema-v1
+report contract.
 It uses bundled, non-sensitive authentication fixtures and isolated
 temporary output. It does not require elevated privileges, read real authentication-log
 contents, or rely on environment-dependent alert results.
@@ -12,9 +12,9 @@ SentinelLite AI is an on-demand local defensive CLI, not a daemon, background mo
 production EDR, external notification service, or AI/LLM system. It observes Linux endpoint
 data only when explicitly invoked and reviews reports locally.
 
-## Safe Demo Shortcut for v1.2.0-beta
+## Safe Demo Shortcut for v1.3.0-beta
 
-Install the published `v1.2.0-beta` wheel using the
+Install the published `v1.3.0-beta` wheel using the
 [README installation instructions](../README.md#install-from-github-release), or use the
 [source installation](../README.md#development-install-from-source) for development.
 Run these commands from a writable directory:
@@ -31,8 +31,8 @@ Use the saved report path printed by `demo` in place of `<REPORT_PATH>`. The dem
 is included in the Python package, so the working directory does not need to be a source
 checkout. It processes three synthetic authentication records in memory using the normal
 normalization, detection, scoring and JSON report pipeline. It uses built-in rules even
-when observation modules or rules are disabled in a selected config. The report schema
-is schema v1 on the development branch; published `v1.2.0-beta` reports remain unversioned.
+when observation modules or rules are disabled in a selected config. The `v1.3.0-beta`
+demo writes schema-v1 reports. Published `v1.2.0-beta` reports remain unversioned.
 Examples are for learning report review and do not describe the real host.
 
 `doctor` checks local versions, system, architecture, packaged default configuration,
@@ -49,16 +49,15 @@ for either command; otherwise they use the selected TOML reporting directory or 
 Demo also honors the TOML setting for stored deterministic explanations. Follow the review
 commands printed by `demo` when using a custom directory.
 
-`dashboard export` is included in the published `v1.2.0-beta` release. It reads existing
+`dashboard export` is included in the published `v1.3.0-beta` release. It reads existing
 local JSON reports only, leaving those reports unchanged, and writes standalone static HTML
 at `reports/dashboard.html` by default. It performs no observation or scanning and uses no
 server, browser auto-open, external scripts/assets, network requests, live monitoring, or
 automatic remediation. Open the saved file manually for offline review. For a custom demo
 directory, pass that same path with `dashboard export --reports-dir PATH`.
 
-The longer fixture walkthrough below requires a source checkout with the Issue #14 schema
-implementation for its schema-v1 contract check. The published wheel is useful for the
-shortcut above, but does not contain these unreleased contract changes.
+The longer walkthrough below uses the authentication fixture files in the source checkout.
+The published wheel includes the schema-v1 parser and bundled synthetic `demo` fixture.
 
 ## Prerequisites
 
@@ -103,8 +102,8 @@ sentinellite --help
 Both version commands must print the same version. The help output should describe a local
 defensive observation and report-review CLI, not a resident agent or service.
 
-The `v1.3.0-beta` release candidate prints `SentinelLite AI v1.3.0-beta` (package version
-`1.3.0b0`), whereas the published `v1.2.0-beta` wheel prints `SentinelLite AI v1.2.0-beta`.
+For the published `v1.3.0-beta` release, both commands print `SentinelLite AI v1.3.0-beta`.
+The Python package version is `1.3.0b0`.
 
 ## 3. Show Local Status
 

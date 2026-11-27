@@ -4,6 +4,11 @@ ARM-SecNet provides an Apple Silicon / UTM / Ubuntu ARM64 lab environment.
 SentinelLite AI can be installed inside that VM as an optional, local, on-demand,
 defensive endpoint observation and report-review CLI.
 
+On November 27, 2026, the owner deferred exact-wheel Ubuntu ARM64 validation for
+`v1.3.0-beta` because the VM was unavailable. This release-specific exception leaves the
+check unverified. Future releases retain their validation requirements.
+[Issue #17](https://github.com/kavisara-samarakoon/sentinellite-ai/issues/17) tracks the run.
+
 ## Scope and Repository Relationship
 
 This is documentation-based integration only. ARM-SecNet and SentinelLite AI remain
@@ -82,15 +87,14 @@ sentinellite --version
 
 Keep this checkout separate from ARM-SecNet. The editable installation uses this
 SentinelLite checkout; it does not install or import ARM-SecNet as a dependency. Keep the
-virtual environment active for subsequent commands. On the `v1.3.0-beta` release candidate,
-the expected version output is `SentinelLite AI v1.3.0-beta` (package version `1.3.0b0`);
-the published `v1.2.0-beta` release outputs `SentinelLite AI v1.2.0-beta`.
+virtual environment active for subsequent commands. The `v1.3.0-beta` tagged source reports
+`SentinelLite AI v1.3.0-beta` (package version `1.3.0b0`).
 
 ## Install from a GitHub Release Wheel
 
 SentinelLite AI is not published to PyPI yet. Download
-`sentinellite_ai-1.2.0b0-py3-none-any.whl` and `SHA256SUMS.txt` from the
-[published v1.2.0-beta GitHub pre-release](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.2.0-beta).
+`sentinellite_ai-1.3.0b0-py3-none-any.whl` and `SHA256SUMS.txt` from the
+[published v1.3.0-beta GitHub pre-release](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.3.0-beta).
 
 Make the downloaded files available inside the Ubuntu VM and verify the
 wheel against `SHA256SUMS.txt`. In the directory containing the verified wheel, create a
@@ -100,17 +104,17 @@ separate environment:
 python3 -m venv .venv-release
 source .venv-release/bin/activate
 python -m pip install --upgrade pip
-python -m pip install ./sentinellite_ai-1.2.0b0-py3-none-any.whl
+python -m pip install ./sentinellite_ai-1.3.0b0-py3-none-any.whl
 sentinellite --version
 ```
 
-The expected version output is `SentinelLite AI v1.2.0-beta`. See the
+The expected version output is `SentinelLite AI v1.3.0-beta`. See the
 [README installation instructions](../../README.md#install-from-github-release) for release
 status. Keep the environment for your source or published wheel installation active below.
 
 ## First Safe Commands
 
-With the `v1.2.0-beta` environment active, run:
+With the `v1.3.0-beta` environment active, run:
 
 ```bash
 sentinellite doctor
@@ -128,7 +132,7 @@ code 0. Typer and Rich must be installed for the CLI to start.
 `demo` uses bundled synthetic fixture data only. It does not read real logs, observe
 processes, network connections or files, or send network traffic. It applies the existing
 authentication processing and report pipeline to synthetic events, saves a normal JSON
-report with the existing schema, and prints its path and suggested review commands.
+report using schema v1, and prints its path and suggested review commands.
 Synthetic alerts are examples for learning the report-review workflow, not findings
 about the VM.
 
@@ -181,21 +185,22 @@ complete this walkthrough. Empty results are not proof that the endpoint is secu
 
 ## Screenshot and Evidence Checklist
 
-The linked Lab 03 evidence records the earlier source run. For a new validation of the
-exact `v1.2.0-beta` release, capture the following from the Ubuntu VM using the
-published wheel or source at the release tag:
+The linked Lab 03 evidence records the earlier source run. For the deferred
+`v1.3.0-beta` validation, install the checksum-verified published wheel and capture the
+following from the Ubuntu VM when it becomes available.
 
 - [ ] `uname -m` output showing `aarch64`
 - [ ] `python3 --version` output showing Python 3.11 or newer
-- [ ] `sentinellite --version`, branch, and full commit output
+- [ ] Wheel filename, verified SHA-256, release tag and target commit, and `sentinellite --version`
 - [ ] `sentinellite doctor` output, including the summary and any failures or warnings
 - [ ] `sentinellite demo` output, including the saved report path
 - [ ] `sentinellite reports list` and `sentinellite reports show <REPORT_PATH>` output
 - [ ] `sentinellite dashboard export --help` and export output with the saved HTML path
 - [ ] Local browser dashboard summary, breakdowns, and alert/report tables
 
-Record the Ubuntu release and SentinelLite branch/commit alongside the evidence so the
-results can be tied to a specific lab run. Label demo reports as synthetic. Review and
+Record the Ubuntu release and the wheel provenance with the VM evidence in
+[Issue #17](https://github.com/kavisara-samarakoon/sentinellite-ai/issues/17).
+Label demo reports as synthetic. Review and
 redact sensitive host, user, path or network details before sharing screenshots or reports,
 especially if you ran the optional observations. Keep real host reports out of both repos.
 

@@ -1,9 +1,9 @@
 # SentinelLite AI Data Contracts
 
-This document describes the schema-v1 alert-report contract implemented for the
-`v1.3.0-beta` release candidate (Issue #14, PR #15), and the separate notification summary.
+This document describes the schema-v1 alert-report contract in the published `v1.3.0-beta`
+GitHub pre-release and the separate notification summary contract.
 Published `v1.0.0-beta` through `v1.2.0-beta` alert reports use the historical unversioned
-contract. Release records remain historical; this document does not claim `v1.3.0-beta` is published.
+contract. See the [v1.3.0-beta release notes](release-notes-v1.3.0-beta.md) for publication details.
 
 Both artifact types are local files and may contain or imply operational security data.
 They should not be committed or shared casually.

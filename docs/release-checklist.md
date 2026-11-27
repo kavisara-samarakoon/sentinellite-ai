@@ -4,6 +4,26 @@ Use this checklist for the exact commit proposed for a SentinelLite AI GitHub pr
 The checklist verifies the existing local defensive CLI; it does not authorize new product
 capabilities or publication to PyPI.
 
+## Published v1.3.0-beta Release Record
+
+`v1.3.0-beta` was published as a
+[GitHub pre-release](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.3.0-beta)
+at `2026-11-27T07:45:25Z`. Release ID `460294277` has draft `false` and prerelease `true`.
+Annotated tag `b13fe9c6030b2422ab45a7df8060f133fa452f8a` points to
+`bf84cf93b40fa73f6489cc4312b2769bcb93204f`. The Python package version is `1.3.0b0`.
+
+- Ubuntu x86-64 CI passed on Python 3.11 and 3.14. Final macOS 27.2.1 ARM64 validation
+  passed 1,991 tests on Python 3.14.6, along with Ruff, `pip check`, and whitespace checks.
+- The wheel and sdist built successfully. Before publication, all three uploaded assets
+  were downloaded and checksum-verified. The downloaded wheel passed isolated installation
+  and synthetic demo/dashboard smoke checks. Manual Safari inspection showed one report,
+  three alerts, highest severity medium, and zero skipped files.
+  [Verified release hashes](release-notes-v1.3.0-beta.md#release-assets-and-sha-256-hashes).
+- On November 27, 2026, the owner deferred exact-wheel Ubuntu ARM64 validation because the
+  VM was unavailable. The check remains unverified under an exception specific to
+  `v1.3.0-beta`. Future release gates still apply.
+  [Issue #17](https://github.com/kavisara-samarakoon/sentinellite-ai/issues/17).
+
 ## Completed v1.2.0-beta Release Record
 
 `v1.2.0-beta` is published as a
@@ -26,10 +46,9 @@ ARM-SecNet evidence remains scoped to one Ubuntu 26.04 LTS `aarch64` VM at Senti
 source commit `d1775f0ca09d714f5ed9d681af90f216c1c39e8e`. It does not establish a new VM run
 at the published release commit or universal ARM64 compatibility.
 
-The unchecked sections below are a reusable checklist for future releases, not the
-publication status of `v1.2.0-beta`. Set version expectations to the intended release and
-record each gate against its exact source commit; the record above lists the confirmed
-checks for this release. Publication is already complete; do not recreate its tag or assets.
+The unchecked sections below apply to future releases. Set version expectations to the
+intended release and record each gate against its exact source commit. Preserve the tags
+and assets of published releases.
 
 ## 1. Scope and Source State
 
