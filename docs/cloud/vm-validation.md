@@ -67,10 +67,15 @@ explicitly set to `x86_64` or `aarch64`):
 set -euo pipefail
 umask 077
 
-# --- Required caller inputs ---
+# --- Required caller inputs (resolved to canonical paths before changing directories) ---
 : "${ARTIFACT_DIR:?Set ARTIFACT_DIR to the approved release artifact directory}"
 : "${FIXTURE_REPO_DIR:?Set FIXTURE_REPO_DIR to the checkout at bf84cf93b40fa73f6489cc4312b2769bcb93204f}"
 : "${EXPECTED_ARCH:?Set EXPECTED_ARCH to x86_64 or aarch64}"
+ARTIFACT_DIR="$(cd "$ARTIFACT_DIR" && pwd -P)"
+FIXTURE_REPO_DIR="$(cd "$FIXTURE_REPO_DIR" && pwd -P)"
+
+# Clear inherited Python path/optimization vars before preflight and validation.
+unset PYTHONPATH PYTHONHOME PYTHONOPTIMIZE
 
 # --- 1. Environment preflight (fail closed; no apt/sudo) ---
 [ -n "${BASH_VERSION:-}" ] || { echo "FAIL: Bash is required." >&2; exit 1; }
@@ -90,10 +95,20 @@ uname -m
 cat /etc/os-release
 python3 --version
 
-# --- 2. Fixture checkout identity & exact checksum enforcement (fail closed) ---
+# --- 2. Fixture checkout identity, cleanliness, & exact checksum enforcement (fail closed) ---
 fixture_head="$(git -C "$FIXTURE_REPO_DIR" rev-parse HEAD)"
 [ "$fixture_head" = "bf84cf93b40fa73f6489cc4312b2769bcb93204f" ] || {
   echo "FAIL: Fixture repo HEAD is $fixture_head, expected bf84cf93b40fa73f6489cc4312b2769bcb93204f" >&2
+  exit 1
+}
+[ -z "$(git -C "$FIXTURE_REPO_DIR" status --porcelain)" ] || {
+  echo "FAIL: Fixture repo $FIXTURE_REPO_DIR is not clean." >&2
+  exit 1
+}
+git -C "$FIXTURE_REPO_DIR" diff --quiet bf84cf93b40fa73f6489cc4312b2769bcb93204f -- \
+  examples/auth_logs/sample_ubuntu_auth.log \
+  tests/fixtures/report_schema/legacy_unversioned_alert.json || {
+  echo "FAIL: Required fixture files do not match commit bf84cf93b40fa73f6489cc4312b2769bcb93204f." >&2
   exit 1
 }
 
@@ -117,10 +132,10 @@ if [ -f "$SDIST_FILE" ]; then
   printf '%s  %s\n' "$EXPECTED_SDIST_SHA" "$SDIST_FILE" | sha256sum -c -
 fi
 
-# --- 3. Isolated venv installation & provenance ---
-# Clear inherited Python path vars so installed wheel is tested without source-tree leakage.
-unset PYTHONPATH PYTHONHOME
+# --- 3. Isolated venv installation & provenance (executed inside private workspace) ---
 WORK_ROOT="$(mktemp -d /tmp/sentinellite-vm-val.XXXXXX)"
+echo "WORK_ROOT=$WORK_ROOT"
+cd "$WORK_ROOT"
 VENV_DIR="$WORK_ROOT/venv"
 python3 -m venv "$VENV_DIR"
 "$VENV_DIR/bin/python" -m pip install --upgrade pip
@@ -129,14 +144,11 @@ python3 -m venv "$VENV_DIR"
 # Note: sentinellite-ai 1.3.0b0 wheel is immutable; transitive dependency versions are not locked.
 "$VENV_DIR/bin/python" -m pip list --format=freeze
 
-(
-  cd "$WORK_ROOT"
-  "$VENV_DIR/bin/python" -c 'from importlib import metadata; from sentinellite import __version__; assert metadata.version("sentinellite-ai") == "1.3.0b0"; assert __version__ == "1.3.0-beta"'
-  test "$("$VENV_DIR/bin/sentinellite" --version)" = "SentinelLite AI v1.3.0-beta"
-  test "$("$VENV_DIR/bin/python" -m sentinellite --version)" = "SentinelLite AI v1.3.0-beta"
-  "$VENV_DIR/bin/sentinellite" --help >/dev/null
-  "$VENV_DIR/bin/sentinellite" >/dev/null
-)
+"$VENV_DIR/bin/python" -c 'from importlib import metadata; from sentinellite import __version__; assert metadata.version("sentinellite-ai") == "1.3.0b0"; assert __version__ == "1.3.0-beta"'
+test "$("$VENV_DIR/bin/sentinellite" --version)" = "SentinelLite AI v1.3.0-beta"
+test "$("$VENV_DIR/bin/python" -m sentinellite --version)" = "SentinelLite AI v1.3.0-beta"
+"$VENV_DIR/bin/sentinellite" --help >/dev/null
+"$VENV_DIR/bin/sentinellite" >/dev/null
 
 # --- 4. Doctor, synthetic demo, and static dashboard export ---
 DEMO_DIR="$WORK_ROOT/demo-reports"
@@ -161,7 +173,17 @@ assert report_data["alert_count"] == 3 and len(report_data["alerts"]) == 3
 assert [a["rule_id"] for a in report_data["alerts"]] == ["AUTH-001", "AUTH-002", "AUTH-003"]
 
 html = Path(sys.argv[2]).read_text(encoding="utf-8")
-for marker in ("SentinelLite AI Local Dashboard", "AUTH-001", "AUTH-002", "AUTH-003"):
+for marker in (
+    "SentinelLite AI Local Dashboard",
+    '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; base-uri \'none\'; form-action \'none\'">',
+    '<div class="card"><span class="muted">Total reports loaded</span><strong class="">1</strong></div>',
+    '<div class="card"><span class="muted">Total alerts shown</span><strong class="">3</strong></div>',
+    '<div class="card"><span class="muted">Highest severity shown</span><strong class="">medium</strong></div>',
+    "Skipped files: 0.",
+    "AUTH-001",
+    "AUTH-002",
+    "AUTH-003",
+):
     assert marker in html, f"Missing dashboard marker: {marker}"
 assert "<script" not in html.lower()
 print("DEMO_AND_DASHBOARD_OK")
@@ -192,9 +214,7 @@ before_legacy_sha="$(sha256sum "$LEGACY_FIXTURE" | awk '{print $1}')"
 NOTIF_PATH="$NOTIF_DIR/alert-summary.json"
 "$VENV_DIR/bin/sentinellite" reports export-notification "$REPORT_PATH" --output "$NOTIF_PATH"
 after_report_sha="$(sha256sum "$REPORT_PATH" | awk '{print $1}')"
-after_legacy_sha="$(sha256sum "$LEGACY_FIXTURE" | awk '{print $1}')"
 test "$before_report_sha" = "$after_report_sha"
-test "$before_legacy_sha" = "$after_legacy_sha"
 
 "$VENV_DIR/bin/python" - "$REPORT_PATH" "$NOTIF_PATH" "$LEGACY_FIXTURE" <<'PY'
 import json
@@ -239,6 +259,9 @@ assert "schema_version" not in legacy.to_dict()
 print("AUTH_SCHEMA_LEGACY_NOTIF_OK")
 PY
 
+after_legacy_sha="$(sha256sum "$LEGACY_FIXTURE" | awk '{print $1}')"
+test "$before_legacy_sha" = "$after_legacy_sha"
+
 # --- 6. Disposable selected-file integrity and baseline comparison (separate output dirs) ---
 FIM_SCAN_DIR="$WORK_ROOT/fim-scan-reports"
 FIM_UNCHANGED_DIR="$WORK_ROOT/fim-unchanged-reports"
@@ -265,16 +288,22 @@ test "$before_modified_sha" = "$(sha256sum "$TARGET_FILE" | awk '{print $1}')"
 "$VENV_DIR/bin/python" - "$FIM_SCAN_DIR" "$FIM_UNCHANGED_DIR" "$FIM_CHANGED_DIR" <<'PY'
 import sys
 from pathlib import Path
+from sentinellite.reporting.schema import ReportContract
 from sentinellite.reporting.validation import parse_report_json
 
+parsed_reports = []
 for d in sys.argv[1:]:
     reports = sorted(Path(d).glob("*.json"))
     assert len(reports) == 1, f"Expected 1 report in {d}, got {reports}"
+    parsed = parse_report_json(reports[0].read_bytes())
+    assert parsed.contract is ReportContract.SCHEMA_V1
+    assert type(parsed.schema_version) is int and parsed.schema_version == 1
+    parsed_reports.append(parsed.to_dict())
 
-unchanged = parse_report_json(next(Path(sys.argv[2]).glob("*.json")).read_bytes()).to_dict()
+unchanged = parsed_reports[1]
 assert unchanged["alert_count"] == 0 and len(unchanged["alerts"]) == 0
 
-changed = parse_report_json(next(Path(sys.argv[3]).glob("*.json")).read_bytes()).to_dict()
+changed = parsed_reports[2]
 assert changed["alert_count"] >= 1
 assert "FIM-004" in {a["rule_id"] for a in changed["alerts"]}
 print("FIM_BASELINE_OK")
@@ -291,22 +320,22 @@ context. Under non-root `/proc` permissions, restricted fields (`exe`, `cmdline`
 `process_name`) may appear as `None`/`[]` or empty connection lists; this reflects expected
 least-privilege visibility rather than complete collector visibility.
 
-Run only when explicitly authorized on the target VM:
+If running Stage 3 in a **separate shell**, set `WORK_ROOT` to the `WORK_ROOT=` path printed
+in Stage 2, derive `VENV_DIR="$WORK_ROOT/venv"`, clear Python path variables, and run from
+`$WORK_ROOT`:
 
 ```bash
+export WORK_ROOT="/tmp/sentinellite-vm-val.REPLACE_ME"
+VENV_DIR="$WORK_ROOT/venv"
+unset PYTHONPATH PYTHONHOME PYTHONOPTIMIZE
+cd "$WORK_ROOT"
 "$VENV_DIR/bin/sentinellite" scan-process --output-dir "$WORK_ROOT/proc-reports"
 "$VENV_DIR/bin/sentinellite" scan-network --output-dir "$WORK_ROOT/net-reports"
 ```
 
-## Stage 4 — Optional Path-Guarded Cleanup (After Evidence Acceptance)
+## Stage 4 — Evidence Retention & Manual Cleanup (After Evidence Acceptance)
 
 Evidence in `$WORK_ROOT` is retained for local inspection. Do **not** publish raw operational
-reports or sensitive host evidence. After recording redacted evidence, remove the private
-workspace with a path-guarded check:
-
-```bash
-case "${WORK_ROOT:-}" in
-  /tmp/sentinellite-vm-val.*) rm -rf -- "$WORK_ROOT" ;;
-  *) echo "Refusing cleanup: unexpected WORK_ROOT=${WORK_ROOT:-unset}" >&2; exit 1 ;;
-esac
-```
+reports or sensitive host evidence. After recording redacted evidence, inspect the exact
+`WORK_ROOT` path printed above and remove it manually using your host's normal file controls
+only after evidence acceptance.

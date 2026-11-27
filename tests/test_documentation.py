@@ -276,7 +276,11 @@ def test_cloud_vm_validation_docs_record_provenance_and_boundaries() -> None:
     assert "c17e285ccf6e99cad8c8e6e2f5ef284da542adc6312fd4f9fd843128df0f128d" in vm_val
     assert "9c18c75a257c7c7d0668200c0a23b419f781041055bef64c8a93f9f25ec24fc4" in vm_val
     assert "--ignore-missing" not in vm_val
-    assert "unset PYTHONPATH PYTHONHOME" in vm_val
+    assert "unset PYTHONPATH PYTHONHOME PYTHONOPTIMIZE" in vm_val
+    assert "Content-Security-Policy" in vm_val
+    assert "Total reports loaded" in vm_val
+    assert "Skipped files: 0." in vm_val
+    assert "rm -rf" not in vm_val
     assert "umask 077" in vm_val
     assert "never run SentinelLite as `root`" in vm_val
     assert "no public dashboard HTTP port" in vm_val
