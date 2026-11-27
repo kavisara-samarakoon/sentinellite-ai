@@ -11,16 +11,13 @@ or perform automatic remediation.
 
 ## Status
 
-The current release candidate in preparation is `v1.3.0-beta` (package version `1.3.0b0`),
-which introduces the versioned alert-report schema v1 and compatibility validation for Issue #14
-(merged in PR #15). See the [v1.3.0-beta release notes](docs/release-notes-v1.3.0-beta.md) for
-candidate scope, validation status, and pending publication details. `v1.3.0-beta` is not yet
-published.
-
-The currently published [GitHub pre-release](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.2.0-beta)
-is `v1.2.0-beta` (see the [v1.2.0-beta release notes](docs/release-notes-v1.2.0-beta.md) for
-publication details and final asset hashes, and [release history](#release-history) for earlier
-milestones). Published `v1.2.0-beta` artifacts retain their historical unversioned report format.
+`v1.3.0-beta` (package version `1.3.0b0`) was published as a
+[GitHub pre-release](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.3.0-beta)
+on November 27, 2026. It introduces the versioned alert-report schema v1 and preserves
+read compatibility with complete historical reports. The
+[v1.3.0-beta release notes](docs/release-notes-v1.3.0-beta.md) record the publication metadata,
+verified asset hashes, completed validation, and the Ubuntu ARM64 deferral.
+Published `v1.2.0-beta` artifacts retain their historical unversioned report format.
 SentinelLite AI is beta-stage software, not a production EDR, and is not published to PyPI.
 
 The automated suite covers configuration, collectors,
@@ -61,8 +58,8 @@ or from a trusted source checkout.
 
 ## Install from GitHub Release
 
-Download `sentinellite_ai-1.2.0b0-py3-none-any.whl` and `SHA256SUMS.txt` from the
-[published v1.2.0-beta release](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.2.0-beta).
+Download `sentinellite_ai-1.3.0b0-py3-none-any.whl` and `SHA256SUMS.txt` from the
+[published v1.3.0-beta release](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.3.0-beta).
 Verify the downloaded wheel against `SHA256SUMS.txt`, then open a terminal in the download
 directory and install it into an isolated environment:
 
@@ -70,11 +67,11 @@ directory and install it into an isolated environment:
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install ./sentinellite_ai-1.2.0b0-py3-none-any.whl
+python -m pip install ./sentinellite_ai-1.3.0b0-py3-none-any.whl
 sentinellite --version
 ```
 
-The expected version output is `SentinelLite AI v1.2.0-beta`. The published wheel includes
+The expected version output is `SentinelLite AI v1.3.0-beta`. The published wheel includes
 `doctor`, `demo`, and `dashboard export` for local installation checks, a synthetic demo,
 and static report review.
 
@@ -132,7 +129,7 @@ No `PYTHONPATH` setting is required after installation.
 
 ## Quick Start
 
-With SentinelLite AI installed (for example, from source or the published `v1.2.0-beta` wheel),
+With SentinelLite AI installed (for example, from source or the published `v1.3.0-beta` wheel),
 check the local installation,
 generate a synthetic report, and export a static dashboard from a writable working directory:
 
@@ -192,12 +189,14 @@ For an authorized Ubuntu ARM64 VM on Apple Silicon / UTM, see the
 SentinelLite AI as an optional local CLI, starting with `sentinellite doctor` and
 `sentinellite demo`, then exporting a local static dashboard. Lab 03 runtime evidence is
 recorded separately for one Ubuntu 26.04 LTS `aarch64` VM using source commit `d1775f0`.
-This does not prove universal ARM64 compatibility or validation of the exact published release commit.
+Exact-wheel Ubuntu ARM64 validation for `v1.3.0-beta` was deferred because the VM was
+unavailable. The historical Lab 03 run covers only its recorded VM and source commit.
+The deferred validation is tracked in [Issue #17](https://github.com/kavisara-samarakoon/sentinellite-ai/issues/17).
 The projects remain separate repositories with no runtime dependency between them.
 
 ### Local Static Dashboard
 
-The static dashboard exporter is included in `v1.3.0-beta` and the published `v1.2.0-beta` release. Run:
+The published `v1.3.0-beta` wheel includes the static dashboard exporter. Run:
 
 ```bash
 sentinellite dashboard export --reports-dir reports --output reports/dashboard.html --limit 25
@@ -401,8 +400,9 @@ git diff --check
 ```
 
 Release preparation must follow the [release checklist](docs/release-checklist.md).
-Ubuntu ARM64 results and their limitations are recorded in the
-[Linux validation notes](docs/linux-validation.md).
+See the [Linux validation notes](docs/linux-validation.md) for historical Ubuntu ARM64 results
+and the [v1.3.0-beta validation record](docs/release-notes-v1.3.0-beta.md#release-validation)
+for the current release.
 
 ## Current Limitations
 
@@ -422,9 +422,10 @@ Ubuntu ARM64 results and their limitations are recorded in the
 
 ## Release History
 
-- [v1.3.0-beta](docs/release-notes-v1.3.0-beta.md) — Current release candidate in preparation
-  (pending validation and publication)
-- [v1.2.0-beta](docs/release-notes-v1.2.0-beta.md) — Current published
+- [v1.3.0-beta](docs/release-notes-v1.3.0-beta.md) — Current published
+  [GitHub pre-release](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.3.0-beta)
+- [v1.2.0-beta](docs/release-notes-v1.2.0-beta.md) — Local dashboard and ARM-SecNet lab milestone,
+  published as a
   [GitHub pre-release](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.2.0-beta)
 
 Historical milestone notes remain available for reference:
@@ -439,9 +440,8 @@ Historical milestone notes remain available for reference:
 - [v0.8.0-alpha](docs/release-notes-v0.8.0-alpha.md)
 - [v0.9.0-alpha](docs/release-notes-v0.9.0-alpha.md)
 
-The previous published release was
-[v1.1.0-beta](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.1.0-beta)
-([release notes](docs/release-notes-v1.1.0-beta.md)); its wheel predates the dashboard exporter.
+The [v1.1.0-beta](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.1.0-beta)
+wheel predates the dashboard exporter. See the [v1.1.0-beta release notes](docs/release-notes-v1.1.0-beta.md).
 Earlier beta notes remain available for [v1.0.0-beta](docs/release-notes-v1.0.0-beta.md).
 
 ## License

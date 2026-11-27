@@ -21,6 +21,10 @@ CURRENT_DOCUMENTS = (
     PROJECT_ROOT / "tests/fixtures/report_schema/README.md",
 )
 MARKDOWN_LINK_PATTERN = re.compile(r"\[[^]]+\]\(([^)]+)\)")
+REPOSITORY_URL = "https://github.com/kavisara-samarakoon/sentinellite-ai"
+V1_3_RELEASE_URL = f"{REPOSITORY_URL}/releases/tag/v1.3.0-beta"
+V1_3_ARM64_ISSUE_URL = f"{REPOSITORY_URL}/issues/17"
+V1_3_WHEEL = "sentinellite_ai-1.3.0b0-py3-none-any.whl"
 
 
 def test_current_document_relative_links_exist() -> None:
@@ -43,17 +47,30 @@ def test_readme_exposes_current_install_and_release_documents() -> None:
     assert "docs/data-contracts.md" in readme
     assert "docs/release-checklist.md" in readme
     assert "production EDR" in readme
-    assert "The current release candidate in preparation is `v1.3.0-beta`" in readme
     assert "docs/release-notes-v1.3.0-beta.md" in readme
-    assert "`v1.3.0-beta` is not yet\npublished." in readme
+    assert "`v1.3.0-beta` (package version `1.3.0b0`) was published as a" in readme
     assert "docs/release-notes-v1.2.0-beta.md" in readme
-    assert "currently published [GitHub pre-release]" in readme
     assert "releases/tag/v1.2.0-beta" in readme
     assert "feature/v1.3-report-schema-v1" not in readme
     assert "releases/tag/v1.1.0-beta" in readme
-    assert "previous published release was\n[v1.1.0-beta]" in readme
+    assert "docs/release-notes-v1.1.0-beta.md" in readme
+    assert "wheel predates the dashboard exporter" in readme
     assert "current published milestone is `v0.9.0-alpha`" not in readme.lower()
     assert "Published `v1.2.0-beta` artifacts retain their historical unversioned report format" in readme
+
+
+def test_readme_and_lab_install_the_published_v1_3_wheel() -> None:
+    for path, heading in (
+        ("README.md", "## Install from GitHub Release\n"),
+        ("docs/integrations/arm-secnet.md", "## Install from a GitHub Release Wheel\n"),
+    ):
+        document = (PROJECT_ROOT / path).read_text(encoding="utf-8")
+        install = document.split(heading, 1)[1].split("\n## ", 1)[0]
+        assert V1_3_RELEASE_URL in install, path
+        assert f"python -m pip install ./{V1_3_WHEEL}" in install, path
+        assert "`SHA256SUMS.txt`" in install, path
+        assert "`SentinelLite AI v1.3.0-beta`" in install, path
+        assert "1.2.0b0" not in install, path
 
 
 def test_beta_release_notes_are_published_and_safety_scoped() -> None:
@@ -83,15 +100,67 @@ def test_beta_release_notes_are_published_and_safety_scoped() -> None:
     assert "no automatic remediation" in normalized_notes
 
 
-def test_v1_3_release_candidate_notes_are_scoped_and_pending() -> None:
+def test_v1_3_release_notes_record_publication_and_verified_assets() -> None:
+    release_notes = (
+        PROJECT_ROOT / "docs/release-notes-v1.3.0-beta.md"
+    ).read_text(encoding="utf-8")
+    normalized_notes = " ".join(release_notes.lower().replace("**", "").split())
+
+    assert V1_3_RELEASE_URL in release_notes
+    assert "`v1.3.0-beta` is published as a [github pre-release]" in normalized_notes
+    for field, value in (
+        ("Published at", "2026-11-27T07:45:25Z"),
+        ("Draft", "false"),
+        ("Prerelease", "true"),
+        ("Release ID", "460294277"),
+        ("Git tag", "v1.3.0-beta"),
+        ("Annotated tag SHA", "b13fe9c6030b2422ab45a7df8060f133fa452f8a"),
+        ("Tag target commit", "bf84cf93b40fa73f6489cc4312b2769bcb93204f"),
+    ):
+        assert f"| {field} | `{value}` |" in release_notes
+    for asset, digest in (
+        (V1_3_WHEEL, "02fb7409a3e071d561700b9783af2136307669aaa332260d4324e20ea3c0dab3"),
+        (
+            "sentinellite_ai-1.3.0b0.tar.gz",
+            "c17e285ccf6e99cad8c8e6e2f5ef284da542adc6312fd4f9fd843128df0f128d",
+        ),
+        ("SHA256SUMS.txt", "9c18c75a257c7c7d0668200c0a23b419f781041055bef64c8a93f9f25ec24fc4"),
+    ):
+        assert f"| `{asset}` | `{digest}` |" in release_notes
+    assert "all three uploaded assets were downloaded and checksum-verified" in normalized_notes
+    assert "ubuntu x86-64 ci passed on python 3.11 and 3.14" in normalized_notes
+    assert "macos 27.2.1 arm64 with python 3.14.6 and 1,991 tests" in normalized_notes
+    assert "one report, three alerts, highest severity medium, and zero skipped files" in (
+        normalized_notes
+    )
+    for stale_status in ("release candidate in preparation", "not yet published", "pending"):
+        assert stale_status not in normalized_notes
+
+
+def test_v1_3_arm64_deferral_remains_release_specific() -> None:
+    for path in (
+        "docs/release-notes-v1.3.0-beta.md",
+        "docs/release-checklist.md",
+        "docs/integrations/arm-secnet.md",
+    ):
+        document = (PROJECT_ROOT / path).read_text(encoding="utf-8")
+        normalized = " ".join(document.lower().split())
+        assert V1_3_ARM64_ISSUE_URL in document, path
+        assert "on november 27, 2026, the owner deferred exact-wheel ubuntu arm64 validation" in (
+            normalized
+        ), path
+        assert "vm was unavailable" in normalized, path
+        assert "unverified" in normalized, path
+        assert re.search(r"exception.{0,40}v1\.3\.0-beta|release-specific exception", normalized), path
+        assert "future release" in normalized, path
+
+
+def test_v1_3_release_notes_are_compatibility_and_safety_scoped() -> None:
     release_notes = (
         PROJECT_ROOT / "docs/release-notes-v1.3.0-beta.md"
     ).read_text(encoding="utf-8")
     normalized_notes = " ".join(release_notes.lower().split())
 
-    assert "release candidate" in normalized_notes
-    assert "not yet published" in normalized_notes
-    assert "pending" in normalized_notes
     assert "1.3.0-beta" in release_notes
     assert "1.3.0b0" in release_notes
     assert "schema_version" in release_notes
@@ -160,6 +229,8 @@ def test_documented_report_and_explanation_examples_are_complete_and_valid() -> 
 def test_demo_uses_fixture_first_non_destructive_flow() -> None:
     demo = (PROJECT_ROOT / "docs/demo-guide.md").read_text(encoding="utf-8")
 
+    assert "Install the published `v1.3.0-beta` wheel" in demo
+    assert "`SentinelLite AI v1.3.0-beta`" in demo
     for command in (
         "sentinellite --version",
         "sentinellite auth-sources list",

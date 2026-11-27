@@ -1,32 +1,32 @@
-# SentinelLite AI v1.3.0-beta — Versioned Alert-Report Schema v1 (Release Candidate)
+# SentinelLite AI v1.3.0-beta — Versioned Alert-Report Schema v1
 
 ## Release Status
 
-`v1.3.0-beta` is a **release candidate in preparation** and is **not yet published**.
+`v1.3.0-beta` is published as a
+[GitHub pre-release](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.3.0-beta).
 
-- Target GitHub pre-release: `v1.3.0-beta` (publication **pending**)
-- Published at: **pending**
-- Git tag: **pending**
-- Annotated tag SHA: **pending**
-- Tag target commit: **pending**
+| Publication field | Value |
+| --- | --- |
+| Published at | `2026-11-27T07:45:25Z` |
+| Draft | `false` |
+| Prerelease | `true` |
+| Release ID | `460294277` |
+| Git tag | `v1.3.0-beta` |
+| Annotated tag SHA | `b13fe9c6030b2422ab45a7df8060f133fa452f8a` |
+| Tag target commit | `bf84cf93b40fa73f6489cc4312b2769bcb93204f` |
 
-The CLI display version is `1.3.0-beta`; normalized Python package metadata is `1.3.0b0`
-(derived dynamically from `sentinellite.__version__`). SentinelLite AI is not published to PyPI.
-
-The currently published GitHub pre-release remains
-[v1.2.0-beta](https://github.com/kavisara-samarakoon/sentinellite-ai/releases/tag/v1.2.0-beta)
-(see the [v1.2.0-beta release notes](release-notes-v1.2.0-beta.md)).
+The CLI prints `SentinelLite AI v1.3.0-beta`. Python package metadata normalizes
+`sentinellite.__version__` to `1.3.0b0`. SentinelLite AI is not published to PyPI.
 
 ## Release Assets and SHA-256 Hashes
 
-Final release asset hashes are **pending** until the final reviewed release commit is tagged
-and artifacts are built from that exact commit:
+All three uploaded assets were downloaded and checksum-verified before publication.
 
 | Asset | SHA-256 |
 | --- | --- |
-| `sentinellite_ai-1.3.0b0-py3-none-any.whl` | **pending** |
-| `sentinellite_ai-1.3.0b0.tar.gz` | **pending** |
-| `SHA256SUMS.txt` | **pending** |
+| `sentinellite_ai-1.3.0b0-py3-none-any.whl` | `02fb7409a3e071d561700b9783af2136307669aaa332260d4324e20ea3c0dab3` |
+| `sentinellite_ai-1.3.0b0.tar.gz` | `c17e285ccf6e99cad8c8e6e2f5ef284da542adc6312fd4f9fd843128df0f128d` |
+| `SHA256SUMS.txt` | `9c18c75a257c7c7d0668200c0a23b419f781041055bef64c8a93f9f25ec24fc4` |
 
 ## Key Changes in v1.3.0-beta (Issue #14, PR #15)
 
@@ -87,19 +87,25 @@ and artifacts are built from that exact commit:
 - Note: the legacy compatibility fixtures are **historical-format replicas** constructed to
   match the `v1.0.0-beta`–`v1.2.0-beta` contract, not actual historical generated artifacts.
 
-## Validation Status and Source-State Distinctions
+## Release Validation
 
+- **Ubuntu x86-64 CI** passed on Python 3.11 and 3.14.
+- **Final macOS validation** passed on macOS 27.2.1 ARM64 with Python 3.14.6 and 1,991 tests.
+  Ruff, `pip check`, `git diff --check`, wheel and sdist builds, isolated wheel installation,
+  and synthetic smoke tests passed.
+- **Downloaded wheel validation** passed isolated installation and synthetic demo and dashboard
+  smoke tests. Manual Safari inspection showed one report, three alerts, highest severity
+  medium, and zero skipped files.
 - **Pre-version-bump `main` baseline (`d278d6af6772546a6730c8323935202e7811b228`, PR #15)**:
   Ubuntu CI passed on Python 3.11 and Python 3.14 (1,990 tests each), including all 16
   schema fixtures and schema/notification contract smoke checks.
-- **macOS release-candidate preparation**: Local validation (editable install, `pip check`,
-  Ruff, full Pytest suite, `git diff --check`, wheel/sdist build, isolated wheel install,
-  version/help/bare-status checks, synthetic auth/report/notification/doctor/demo/dashboard
-  smoke checks) is executed on the uncommitted candidate before the release-candidate commit.
-- **Ubuntu ARM64 exact-candidate validation**: **Pending** execution on the ARM-SecNet Ubuntu
-  ARM64 VM against the committed release-candidate source/artifact.
-- **Final exact-commit validation and artifact build**: **Pending** final release-candidate
-  commit.
+
+### Deferred Ubuntu ARM64 Validation
+
+On November 27, 2026, the owner deferred exact-wheel Ubuntu ARM64 validation because the
+ARM-SecNet VM was unavailable. This exception applies only to `v1.3.0-beta`. The check
+remains unverified, and future releases retain their validation requirements.
+[Issue #17](https://github.com/kavisara-samarakoon/sentinellite-ai/issues/17) tracks the exact-wheel run.
 
 These checks do not claim universal Linux or ARM64 compatibility.
 
@@ -129,5 +135,5 @@ compromise.
 
 ## Release History
 
-The current published milestone is [v1.2.0-beta](release-notes-v1.2.0-beta.md).
-Its historical publication details remain unchanged; they do not describe this release candidate.
+The previous published milestone was [v1.2.0-beta](release-notes-v1.2.0-beta.md), which
+introduced the static dashboard and recorded the ARM-SecNet lab validation.
