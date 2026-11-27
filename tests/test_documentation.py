@@ -17,6 +17,9 @@ CURRENT_DOCUMENTS = (
     PROJECT_ROOT / "docs/release-notes-v1.1.0-beta.md",
     PROJECT_ROOT / "docs/release-notes-v1.2.0-beta.md",
     PROJECT_ROOT / "docs/release-notes-v1.3.0-beta.md",
+    PROJECT_ROOT / "docs/cloud/vm-validation.md",
+    PROJECT_ROOT / "docs/cloud/compatibility-matrix.md",
+    PROJECT_ROOT / "docs/cloud/evidence-checklist.md",
     PROJECT_ROOT / "docs/integrations/arm-secnet.md",
     PROJECT_ROOT / "tests/fixtures/report_schema/README.md",
 )
@@ -255,3 +258,37 @@ def test_only_packaged_internal_yaml_remains_and_uses_passive_wording() -> None:
     assert packaged_yaml.is_file()
     assert "open ports" not in packaged_text
     assert "active network connection metadata" in packaged_text
+
+
+def test_cloud_vm_validation_docs_record_provenance_and_boundaries() -> None:
+    vm_val = (PROJECT_ROOT / "docs/cloud/vm-validation.md").read_text(encoding="utf-8")
+    matrix = (PROJECT_ROOT / "docs/cloud/compatibility-matrix.md").read_text(
+        encoding="utf-8"
+    )
+    checklist = (PROJECT_ROOT / "docs/cloud/evidence-checklist.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert V1_3_RELEASE_URL in vm_val
+    assert V1_3_WHEEL in vm_val
+    assert "bf84cf93b40fa73f6489cc4312b2769bcb93204f" in vm_val
+    assert "02fb7409a3e071d561700b9783af2136307669aaa332260d4324e20ea3c0dab3" in vm_val
+    assert "c17e285ccf6e99cad8c8e6e2f5ef284da542adc6312fd4f9fd843128df0f128d" in vm_val
+    assert "9c18c75a257c7c7d0668200c0a23b419f781041055bef64c8a93f9f25ec24fc4" in vm_val
+    assert "--ignore-missing" not in vm_val
+    assert "unset PYTHONPATH PYTHONHOME PYTHONOPTIMIZE" in vm_val
+    assert "Content-Security-Policy" in vm_val
+    assert "Total reports loaded" in vm_val
+    assert "Skipped files: 0." in vm_val
+    assert "rm -rf" not in vm_val
+    assert "umask 077" in vm_val
+    assert "never run SentinelLite as `root`" in vm_val
+    assert "no public dashboard HTTP port" in vm_val
+    assert "FIM-004" in vm_val
+    assert "RETAINED_WORKSPACE=" in vm_val
+    assert "scan-auth /var/log" not in vm_val
+    assert V1_3_ARM64_ISSUE_URL in matrix
+    assert "Does **not** establish Azure runtime" in matrix
+    assert "umask 077" in checklist
+    assert "interactive browser rendering" in checklist
+    assert "FIM-004" in checklist
