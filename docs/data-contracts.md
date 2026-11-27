@@ -212,6 +212,55 @@ there is intentionally reported as incompatible.
 Notification export writes local JSON only. It does not send data, make network requests,
 or provide email, Slack, Discord, webhook, SMS, provider, token, AI, or LLM behavior.
 
+## Offline Telemetry Contract (`sentinellite_telemetry` v1)
+
+`sentinellite reports export-telemetry REPORT_PATH --output OUTPUT_PATH` writes an
+offline, privacy-minimized telemetry JSON file derived from one explicitly selected alert
+report. It performs no network activity, credential acquisition, or Azure ingestion.
+
+### Envelope & Group Fields
+
+- **Top-level fields (exact allowlist):** `schema_version` (integer `1`, never `bool`),
+  `output_type` (`"sentinellite_telemetry"`), `export_id` (generated lowercase UUIDv4),
+  `exported_at` (generated canonical UTC ISO-8601 `Z` timestamp), `alert_count`
+  (`0 <= alert_count <= 1000`), and `groups` (list of `0..128` groups).
+- **Group fields (exact allowlist):** `rule_id` (closed v1 allowlist: `AUTH-001`–`AUTH-003`,
+  `PROC-001`–`PROC-003`, `NET-001`–`NET-003`, `FIM-001`–`FIM-008`), `severity`,
+  `risk_level`, and `count` (positive exact integer). Groups are unique and sorted
+  lexicographically by `(rule_id, severity, risk_level)` with `sum(count) == alert_count`.
+- **Empty reports:** `alert_count: 0` with `groups: []` is valid.
+- **Excluded source data:** Report IDs, timestamps, alert/event IDs, paths, usernames,
+  hostnames, IP/MAC addresses, process arguments, hashes, messages, descriptions,
+  recommendations, explanations, arbitrary categories, numeric risk scores, and raw
+  evidence are never projected.
+
+### Resource Limits, Filesystem Policy, & Saved-Artifact Validation
+
+- **Fail-closed limits:** `1` report per export, `2,097,152` bytes (2 MiB) max input, `64`
+  max JSON container nesting depth, `1,000` max alerts, `128` max groups, `65,536` bytes
+  (64 KiB) max serialized output and max saved-telemetry input.
+- **Private directory & source policy:** Both source and output parent directories must
+  already exist, be owned by the effective user, have mode `0700`, and not be symlinks.
+  Source reports must be owner-owned regular files with no group/other permission bits
+  (mode `0600` recommended). Existing source reports are never modified or `chmod`ed. POSIX
+  mode checks assume trusted ancestor directories, trusted ACL configurations, and trusted
+  filesystems; unsupported required safety primitives fail closed.
+- **Writer validation & no-clobber publication:** `write_telemetry_file()` strictly
+  validates and canonically serializes the payload before any filesystem mutation, writes
+  complete bytes to a `0600` same-directory temporary file, `fsync`s, publishes via atomic
+  no-clobber `os.link`, and unlinks the temporary file without modifying the source report.
+  Pre-publication cleanup failures are reported explicitly without losing the original error
+  (`published=False`); post-publication cleanup/sync failures report `published=True`
+  without deleting the published file. Ancestor-directory symlinks and concurrent
+  equivalent-privilege modification remain OS-level residual risks.
+- **Saved-artifact validation:** `parse_telemetry_json()` validates bounded UTF-8 telemetry
+  JSON, rejects duplicate keys, nonfinite numbers, lone surrogates, and unsorted/duplicate
+  groups, and preserves `export_id` and `exported_at`.
+- **Outcomes & guarantees:** Errors report fixed sanitized outcomes (`malformed`,
+  `incompatible`, `unsupported-schema`, `unsupported-rule`, `limit-exceeded`,
+  `output-error`). Minimization is not anonymization, structural validation is not
+  authenticity, and exactly-once delivery across re-exports is not guaranteed.
+
 ## Contract Compatibility Rule
 
 New alert reports use schema v1; complete historical unversioned reports remain readable

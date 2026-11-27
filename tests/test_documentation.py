@@ -20,6 +20,9 @@ CURRENT_DOCUMENTS = (
     PROJECT_ROOT / "docs/cloud/vm-validation.md",
     PROJECT_ROOT / "docs/cloud/compatibility-matrix.md",
     PROJECT_ROOT / "docs/cloud/evidence-checklist.md",
+    PROJECT_ROOT / "docs/cloud/telemetry-design.md",
+    PROJECT_ROOT / "docs/cloud/telemetry-threat-model.md",
+    PROJECT_ROOT / "docs/cloud/telemetry-implementation-plan.md",
     PROJECT_ROOT / "docs/integrations/arm-secnet.md",
     PROJECT_ROOT / "tests/fixtures/report_schema/README.md",
 )
@@ -292,3 +295,39 @@ def test_cloud_vm_validation_docs_record_provenance_and_boundaries() -> None:
     assert "umask 077" in checklist
     assert "interactive browser rendering" in checklist
     assert "FIM-004" in checklist
+
+
+def test_telemetry_design_docs_define_contract_limits_and_azure_boundaries() -> None:
+    design = (PROJECT_ROOT / "docs/cloud/telemetry-design.md").read_text(encoding="utf-8")
+    threat = (PROJECT_ROOT / "docs/cloud/telemetry-threat-model.md").read_text(
+        encoding="utf-8"
+    )
+    plan = (PROJECT_ROOT / "docs/cloud/telemetry-implementation-plan.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "sentinellite_telemetry" in design
+    assert "1,000" in design
+    assert "128" in design
+    assert "64 KiB" in design
+    assert "2 MiB" in design
+    assert "Managed Identity" in design
+    assert "Minimization is not anonymization" in threat
+    assert "Structural validation is not authenticity" in threat
+    assert "O_NOFOLLOW" in threat
+    assert "O_NONBLOCK" in design
+    assert "parse_telemetry_json()" in design
+    assert "from None" in design
+    assert "64" in design
+    assert "export-telemetry" in design
+    assert "Default `--dry-run`" in plan
+    assert "FIFO" in plan
+    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    contracts = (PROJECT_ROOT / "docs/data-contracts.md").read_text(encoding="utf-8")
+    security = (PROJECT_ROOT / "SECURITY.md").read_text(encoding="utf-8")
+    assert "sentinellite reports export-telemetry" in readme
+    assert "umask 077" in readme
+    assert "Offline Telemetry Contract" in contracts
+    assert "write_telemetry_file()" in contracts
+    assert "offline telemetry exports" in security.lower()
+    assert "minimization is not anonymization" in " ".join(security.lower().split())
